@@ -231,7 +231,7 @@
     },
     {
       "name": "Skolengo",
-      "url": "cas.skolengo.com",
+      "url": "*.skolengo.com",
       "py": "cas_kosmos"
     },
     {
