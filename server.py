@@ -1042,7 +1042,6 @@ def discussions(token: str, response):
 				})
 
 			discussionData = {
-				"id": discussion.id,
 				"subject": discussion.subject,
 				"creator": discussion.creator,
 				"participants": discussion.participants,
