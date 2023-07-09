@@ -156,8 +156,11 @@ def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode
 		token = secrets.token_urlsafe(16)
 
 		# Set current period
-		client.calculated_period = __get_current_period(client)
-		client.activated_period = __get_current_period(client, False, None, True)
+		try:
+			client.calculated_period = __get_current_period(client)
+			client.activated_period = __get_current_period(client, False, None, True)
+		except:
+			print("Failed to get current period")
 
 		saved_clients[token] = {
 			'client': client,
