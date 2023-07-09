@@ -316,8 +316,7 @@ def user(token: str, response):
 					'start': period.start.strftime('%Y-%m-%d'),
 					'end': period.end.strftime('%Y-%m-%d'),
 					'name': period.name,
-					'id': period.id,
-					'actual': client.calculated_period.id == period.id
+					'id': period.id
 				})
 
 			userData = {
