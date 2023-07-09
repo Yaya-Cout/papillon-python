@@ -210,6 +210,9 @@ def __get_current_period(client: pronotepy.Client, wantSpecificPeriod: bool = Fa
 	
 	if client.logged_in:
 		if not wantSpecificPeriod:
+			# assignation 'allperiods' vide pour fixer le démarrage de l'API
+			allPeriods = []
+
 			CURRENT_PERIOD_NAME = client.current_period.name.split(' ')[0]
 			if CURRENT_PERIOD_NAME == 'Trimestre':
 				CURRENT_PERIOD_NAME = 'Trimestre'
