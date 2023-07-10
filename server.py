@@ -156,12 +156,9 @@ def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode
 		token = secrets.token_urlsafe(16)
 
 		# Set current period
-		try:
-			client.calculated_period = __get_current_period(client)
-			client.activated_period = __get_current_period(client, False, None, True)
-		except:
-			print("Failed to get current period")
-			client.calculated_period.id = 0
+		client.calculated_period = __get_current_period(client)
+		print(client.calculated_period)
+		client.activated_period = __get_current_period(client, False, None, True)
 
 		saved_clients[token] = {
 			'client': client,
@@ -211,9 +208,6 @@ def __get_current_period(client: pronotepy.Client, wantSpecificPeriod: bool = Fa
 	
 	if client.logged_in:
 		if not wantSpecificPeriod:
-			# assignation 'allperiods' vide pour fixer le démarrage de l'API
-			allPeriods = []
-
 			CURRENT_PERIOD_NAME = client.current_period.name.split(' ')[0]
 			if CURRENT_PERIOD_NAME == 'Trimestre':
 				CURRENT_PERIOD_NAME = 'Trimestre'
@@ -225,18 +219,26 @@ def __get_current_period(client: pronotepy.Client, wantSpecificPeriod: bool = Fa
 				print("WARN: Couldn't find current period name")
 				return client.current_period
 			
-			if wantAllPeriods: allPeriods = []
+			allPeriods = []
+			currentPeriods = []
 
 			for period in client.periods:
 				if period.name.split(' ')[0] == CURRENT_PERIOD_NAME:
-					
-					if not wantAllPeriods:   
-						raw = datetime.datetime.now().date()
-						now = datetime.datetime(raw.year, raw.month, raw.day)
-						if period.start <= now <= period.end:
-							return period
-					else:
-						allPeriods.append(period)
+					currentPeriods.append(period)
+
+			for i in range(len(currentPeriods)):
+				period = currentPeriods[i]
+				if not wantAllPeriods:   
+					raw = datetime.datetime.now().date()
+					now = datetime.datetime(raw.year, raw.month, raw.day)
+
+					if period.start <= now <= period.end:
+						return period
+
+					if i == len(currentPeriods) - 1:
+						return period
+				else:
+					allPeriods.append(period)
 			
 			return allPeriods
 		else:
@@ -316,7 +318,8 @@ def user(token: str, response):
 					'start': period.start.strftime('%Y-%m-%d'),
 					'end': period.end.strftime('%Y-%m-%d'),
 					'name': period.name,
-					'id': period.id
+					'id': period.id,
+					'actual': client.calculated_period.id == period.id
 				})
 
 			userData = {
