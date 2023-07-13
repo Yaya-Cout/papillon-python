@@ -172,13 +172,13 @@
     },
     {
       "name": "Lycée Connecté",
-      "url": "jeunes.nouvelle-aquitaine.fr",
+      "url": "mon.lyceeconnecte.fr",
       "py": "lyceeconnecte_aquitaine",
       "educonnect": false
     },
     {
       "name": "Lycée Connecté via ÉduConnect",
-      "url": "jeunes.nouvelle-aquitaine.fr",
+      "url": "mon.lyceeconnecte.fr",
       "py": "lyceeconnecte_edu",
       "educonnect": true
     },
