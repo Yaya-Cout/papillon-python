@@ -11,7 +11,7 @@ ent = input('Code de l\'ENT $ ')
 
 response = requests.post(api_url.rstrip('/') + '/generatetoken', data={'url': pronote_url, 'username': username, 'password': password, 'ent': ent})
 print('login effectué')
-token = response.json()
+token = response.json()['token']
 
 start = time.time()
 response = requests.get(api_url.rstrip('/') + '/user', params={'token': token})
