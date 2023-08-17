@@ -2,7 +2,6 @@ FROM debian:bullseye-slim
 
 # Set environment variable
 ENV CRON="*/25 * * * *"
-
 # remove all files /hosting even if there's nothing
 RUN rm -rf /hosting
 
@@ -23,7 +22,6 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
 
 RUN exec bash
 RUN npm install -g pm2
-
 
 # Install Papillon
 RUN mkdir -p /hosting/papillon
