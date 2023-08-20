@@ -64,7 +64,7 @@ def get_client(token: str) -> tuple[str, pronotepy.Client|None]:
 			pronotepy.Client|None: une instance de client si le token est valide, None sinon.
 
 	"""
-	if MAINTENANCE['enabled']:
+	if MAINTENANCE['enable']:
 		return 'maintenance', None
 	if token in saved_clients:
 		client_dict = saved_clients[token]
@@ -81,11 +81,11 @@ def get_client(token: str) -> tuple[str, pronotepy.Client|None]:
 @hug.get('/infos')
 def infos():
 	return {
-		'status': 'ok' if not MAINTENANCE['enabled'] else 'maintenance',
-		'message': 'server is running' if not MAINTENANCE['enabled'] else MAINTENANCE['message'],
+		'status': 'ok' if not MAINTENANCE['enable'] else 'maintenance',
+		'message': 'server is running' if not MAINTENANCE['enable'] else MAINTENANCE['message'],
 		'server': socket.gethostname(),
 		'version': API_VERSION,
-		'ent_list': CAS_LIST if not MAINTENANCE['enabled'] else []
+		'ent_list': CAS_LIST if not MAINTENANCE['enable'] else []
 	}
  
 # requête initiale :
@@ -94,7 +94,7 @@ def infos():
 # GET * token=token
 @hug.post('/generatetoken')
 def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode'])='url'):
-	if MAINTENANCE['enabled']:
+	if MAINTENANCE['enable']:
 		response.status = falcon.get_http_status(503)
 		return {
 			'token': False,
