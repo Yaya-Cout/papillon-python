@@ -25,6 +25,6 @@ RUN npm install -g pm2
 
 # Install Papillon
 RUN mkdir -p /hosting/papillon
-RUN curl -o /hosting/papillon/start.sh https://git.tryon-lab.fr/tryon/Papillon/raw/branch/main/papillon_start.sh
+RUN curl -o /hosting/papillon/start.sh https://raw.githubusercontent.com/PapillonApp/papillon-python/development/papillon_start.sh
 RUN chmod +x /hosting/papillon/start.sh
 CMD cd /hosting/papillon/ && pm2 start --name "Papillon" /hosting/papillon/start.sh --cron-restart="$CRON" && pm2 logs
