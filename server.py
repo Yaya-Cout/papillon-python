@@ -17,6 +17,7 @@ resource.setrlimit(resource.RLIMIT_CORE, (resource.RLIM_INFINITY, resource.RLIM_
 from pronotepy.ent import *
 
 API_VERSION = open('VERSION', 'r').read().strip()
+MAINTENANCE = json.load(open('maintenance.json', 'r', encoding='utf8'))
 CAS_LIST = json.load(open('cas_list.json', 'r', encoding='utf8'))
 
 # ajouter les CORS sur toutes les routes
@@ -63,6 +64,8 @@ def get_client(token: str) -> tuple[str, pronotepy.Client|None]:
 			pronotepy.Client|None: une instance de client si le token est valide, None sinon.
 
 	"""
+	if MAINTENANCE['enabled']:
+		return 'maintenance', None
 	if token in saved_clients:
 		client_dict = saved_clients[token]
 		if time.time() - client_dict['last_interaction'] < client_timeout_threshold:
@@ -78,19 +81,26 @@ def get_client(token: str) -> tuple[str, pronotepy.Client|None]:
 @hug.get('/infos')
 def infos():
 	return {
-		'status': 'ok',
-		'message': 'server is running',
+		'status': 'ok' if not MAINTENANCE['enabled'] else 'maintenance',
+		'message': 'server is running' if not MAINTENANCE['enabled'] else MAINTENANCE['message'],
 		'server': socket.gethostname(),
 		'version': API_VERSION,
-		'ent_list': CAS_LIST
+		'ent_list': CAS_LIST if not MAINTENANCE['enabled'] else []
 	}
-
+ 
 # requête initiale :
 # un client doit faire
 # token = POST /generatetoken body={url, username, password, ent}
 # GET * token=token
 @hug.post('/generatetoken')
 def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode'])='url'):
+	if MAINTENANCE['enabled']:
+		response.status = falcon.get_http_status(503)
+		return {
+			'token': False,
+			'error': 'Maintenance'
+		}
+
 	if not body is None:
 		noENT = False
 
