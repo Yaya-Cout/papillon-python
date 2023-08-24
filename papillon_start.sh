@@ -4,7 +4,7 @@ start_api() {
         rm -rf papillon-python
         git rm --cached filename
         git clone -b development https://github.com/PapillonApp/papillon-python
-        pip3.11 install -U https://github.com/bain3/pronotepy/archive/refs/heads/master.zip
+        pip3.11 install -U https://github.com/bain3/pronotepy/archive/refs/heads/2023-compatibility.zip
         pip3.11 install -U lxml
         pip3.11 install -U hug
         cd papillon-python
