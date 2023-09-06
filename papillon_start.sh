@@ -2,7 +2,7 @@ echo "Papillon    ^=^z    EN COURS : Mise    jour repo api Papillon"
 start_api() {
         # TAG_NAME = git describe --tags $(git rev-list --tags --max-count=1)
         rm -rf papillon-python
-        pip uninstall pronotepy
+        pip uninstall pronotepy -y
         git rm --cached filename
         git clone -b development https://github.com/PapillonApp/papillon-python
         pip3.11 install -U https://github.com/bain3/pronotepy/archive/refs/heads/master.zip
