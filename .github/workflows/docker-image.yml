@@ -3,7 +3,7 @@ name: Docker Image Build and Publish to Docker Hub
 on:
   push:
     branches:
-      - development  # Changer en la branche que vous souhaitez surveiller
+      - main  # Changer en la branche que vous souhaitez surveiller
 
 jobs:
   build_and_publish:
