@@ -2,6 +2,7 @@ echo "Papillon    ^=^z    EN COURS : Mise    jour repo api Papillon"
 start_api() {
         # TAG_NAME = git describe --tags $(git rev-list --tags --max-count=1)
         rm -rf papillon-python
+        pip install --upgrade pip
         pip uninstall pronotepy -y
         git rm --cached filename
         git clone -b development https://github.com/PapillonApp/papillon-python
