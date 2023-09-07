@@ -5,28 +5,19 @@
       "py": ""
     },
     {
-      "name": "Académie de Clermont-Ferrand (Ma Classe En Auvergne Rhône-Alpes)",
-      "url": "cas.ent.auvergnerhonealpes.fr",
-      "py": "ac_clermont_ferrand"
-    },
-    {
-      "name": "Académie de Grenoble (Ma Classe En Auvergne Rhône-Alpes)",
-      "url": "cas.ent.auvergnerhonealpes.fr",
-      "py": "ac_grenoble"
-    },
-    {
       "name": "Académie de la Réunion (Métice)",
       "url": "sso.ac-reunion.fr",
       "py": "ac_reunion",
       "educonnect": true
     },
     {
-      "name": "Académie de Lyon (Ma Classe En Auvergne Rhône-Alpes)",
-      "url": "cas.ent.auvergnerhonealpes.fr",
-      "py": "ac_lyon"
+      "name": "Académie de Montpellier (Mon ENT Occitanie)",
+      "url": "cas.mon-ent-occitanie.fr",
+      "py": "occitanie_montpellier",
+      "educonnect": true
     },
     {
-      "name": "Académie de Montpellier (Mon ENT Occitanie)",
+      "name": "Académie de Montpellier (Mon ENT Occitanie) via EduConnect",
       "url": "cas.mon-ent-occitanie.fr",
       "py": "occitanie_montpellier_educonnect",
       "educonnect": true
@@ -69,7 +60,8 @@
     {
       "name": "Arsene76",
       "url": "cas.arsene76.fr",
-      "py": "cas_arsene76"
+      "py": "cas_arsene76",
+      "educonnect": true
     },
     {
       "name": "Arsene76 via ÉduConnect",
@@ -81,11 +73,6 @@
       "name": "Atrium Sud",
       "url": "www.atrium-sud.fr",
       "py": "atrium_sud"
-    },
-    {
-      "name": "CyberColleges42",
-      "url": "cas.cybercolleges42.fr",
-      "py": "cas_cybercolleges42"
     },
     {
       "name": "CyberColleges42 via ÉduConnect",
@@ -133,7 +120,27 @@
       "py": "cas_ent27"
     },
     {
+      "name": "L'ENT Creuse",
+      "url": "cas.entcreuse.fr",
+      "py": "ent_creuse"
+    },
+    {
+      "name": "ENT27",
+      "url": "cas.ent27.fr",
+      "py": "cas_ent27"
+    },
+    {
       "name": "ENT77",
+      "url": "ent.ecollege78.fr",
+      "py": "ent_ecollege78"
+    },
+    {
+      "name": "ENT94 (NEO)",
+      "url": "ent94.opendigitaleducation.com",
+      "py": "ent_94"
+    },
+    {
+      "name": "eCollège Yvelines",
       "url": "ent77.seine-et-marne.fr",
       "py": "ent77"
     },
@@ -150,7 +157,7 @@
     },
     {
       "name": "Extranet Collèges de la Somme",
-      "url": "colleges.cg80.fr",
+      "url": "www.colleges.cg80.fr",
       "py": "extranet_colleges_somme"
     },
     {
@@ -201,8 +208,13 @@
     },
     {
       "name": "Mon Collège (Essonne)",
-      "url": "www.moncollege-ent.essonne.fr",
+      "url": "moncollege-ent.var.fr",
       "py": "ent_essonne"
+    },
+    {
+      "name": "Mon Collège (Var)",
+      "url": "cas.moncollege.valdoise.fr",
+      "py": "ent_var"
     },
     {
       "name": "MonLycée.net",
@@ -218,11 +230,6 @@
       "name": "OSÉ (Argos 2.0)",
       "url": "ds.ac-bordeaux.fr",
       "py": "ent2d_bordeaux"
-    },
-    {
-      "name": "OZE Collège (Yvelines)",
-      "url": "ozecollege.yvelines.fr",
-      "py": "ozecollege_yvelines"
     },
     {
       "name": "Paris Classe Numérique",
