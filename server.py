@@ -975,10 +975,6 @@ def news(token: str, response):
 			"html_content": str,
 		}]
 	"""
-	
-	# FIXME: This is a temporary fix for the news endpoint, maybe Pronote changed something in their API
-	response.status = falcon.get_http_status(501)
-	return "This endpoint is currently unavailable."
  
 	success, client = get_client(token)
 	if success == 'ok':
