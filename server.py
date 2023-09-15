@@ -206,7 +206,7 @@ def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode
 
 		# if error return error
 		if client.logged_in:
-			if method == "qrcode":
+			if method != "url":
 				QRtokenArray = {
 					"token": token,
 					"error": False,
