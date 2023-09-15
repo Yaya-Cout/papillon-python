@@ -1587,7 +1587,7 @@ def set_homework_as_done(token: str, dateFrom: str, dateTo: str, homeworkId: str
 		token (str): Le token du client Pronote
 		dateFrom (str): La date de début
 		dateTo (str): La date de fin
-		homeworkId (str): L'ID du devoir
+		homeworkId (str): Le LocaID du devoir
 		response (falcon.Response): La réponse de la requête
 		
 	Returns:
@@ -1604,8 +1604,19 @@ def set_homework_as_done(token: str, dateFrom: str, dateTo: str, homeworkId: str
 				homeworks = client.homework(date_from=dateFrom, date_to=dateTo)
 				
 				for homework in homeworks:
+					local_id = ""
+
+					# return a combination of the 20 first letters of description, 2 first letters of subject name and the date
+					if len(homework.description) > 20:
+						local_id += homework.description[:20]
+					else:
+						local_id += homework.description
+					
+					local_id += homework.subject.name[:2]
+					local_id += homework.date.strftime("%Y-%m-%d_%H:%M")
+
 					changed = False
-					if homework.id == homeworkId:
+					if local_id == homeworkId:
 						if homework.done: homework.set_done(False)
 						else: homework.set_done(True)
 						changed = True
@@ -1617,7 +1628,7 @@ def set_homework_as_done(token: str, dateFrom: str, dateTo: str, homeworkId: str
 					response.status = falcon.get_http_status(404)
 					return {
 						"status": "not found",
-						"error": "Aucun devoir trouvé avec cet ID."
+						"error": "Aucun devoir trouvé avec cet ID local."
 					}
 			except Exception as e:
 				response.status = falcon.get_http_status(500)
