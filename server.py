@@ -565,8 +565,20 @@ def homework(token: str, dateFrom: str, dateTo: str, response):
 						"type": file.type
 					})
 
+				local_id = ""
+
+				# return a combination of the 20 first letters of description, 2 first letters of subject name and the date
+				if len(homework.description) > 20:
+					local_id += homework.description[:20]
+				else:
+					local_id += homework.description
+				
+				local_id += homework.subject.name[:2]
+				local_id += homework.date.strftime("%Y-%m-%d_%H:%M")
+
 				homeworkData = {
 					"id": homework.id,
+					"local_id": local_id,
 					"subject": {
 						"id": homework.subject.id,
 						"name": homework.subject.name,
