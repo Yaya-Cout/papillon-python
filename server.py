@@ -93,7 +93,7 @@ def infos():
 # token = POST /generatetoken body={url, username, password, ent}
 # GET * token=token
 @hug.post('/generatetoken')
-def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode'])='url'):
+def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode', 'token'])='url'):
 	if MAINTENANCE['enable']:
 		response.status = falcon.get_http_status(503)
 		return {
@@ -132,7 +132,7 @@ def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode
 				return error
 
 		elif method == "qrcode":
-			for rk in ('url', 'qrToken', 'login', 'checkCode'):
+			for rk in ('url', 'qrToken', 'login', 'checkCode', 'uuid'):
 				if not rk in body:
 					response.status = falcon.get_http_status(400)
 					return {
@@ -152,7 +152,7 @@ def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode
 					"jeton": body['qrToken'],
 					"login": body['login'],
 					"url": body['url']
-				}, body['checkCode'])
+				}, body['checkCode'], body['uuid'])
 			except Exception as e:
 				response.status = falcon.get_http_status(498)
 				print(e)
@@ -163,6 +163,33 @@ def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode
 				}
 				return error
 		
+		elif method == "token":
+			for rk in ('url', 'username', 'password', 'uuid'):
+				if not rk in body:
+					response.status = falcon.get_http_status(400)
+					return {
+						"token": False,
+						"error": f'Missing {rk}'
+					}
+
+			try:
+				client = pronotepy.Client.token_login(
+					pronote_url = body['url'],
+					username = body['username'],
+					password = body['password'],
+					uuid=body['uuid']
+				)
+			except Exception as e:
+				response.status = falcon.get_http_status(498)
+				print(f"Error while trying to connect to {body['url']}")
+				print(e)
+
+				error = {
+					"token": False,
+					"error": str(e),
+				}
+				return error
+
 		token = secrets.token_urlsafe(16)
 
 		# Set current period
@@ -179,6 +206,19 @@ def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode
 
 		# if error return error
 		if client.logged_in:
+			if method == "qrcode":
+				QRtokenArray = {
+					"token": token,
+					"error": False,
+					"qr_credentials": {
+						"username": client.username,
+						"password": client.password,
+						"url": client.pronote_url
+					}
+				}
+
+				return QRtokenArray
+
 			tokenArray = {
 				"token": token,
 				"error": False
