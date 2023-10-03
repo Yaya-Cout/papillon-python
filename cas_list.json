@@ -208,12 +208,12 @@
     },
     {
       "name": "Mon Collège (Essonne)",
-      "url": "moncollege-ent.var.fr",
+      "url": "moncollege-ent.essonne.fr",
       "py": "ent_essonne"
     },
     {
       "name": "Mon Collège (Var)",
-      "url": "cas.moncollege.valdoise.fr",
+      "url": "moncollege-ent.var.fr",
       "py": "ent_var"
     },
     {
