@@ -13,12 +13,6 @@
     {
       "name": "Académie de Montpellier (Mon ENT Occitanie)",
       "url": "cas.mon-ent-occitanie.fr",
-      "py": "occitanie_montpellier",
-      "educonnect": true
-    },
-    {
-      "name": "Académie de Montpellier (Mon ENT Occitanie) via EduConnect",
-      "url": "cas.mon-ent-occitanie.fr",
       "py": "occitanie_montpellier_educonnect",
       "educonnect": true
     },
@@ -30,11 +24,6 @@
     },
     {
       "name": "Académie de Toulouse (Mon ENT Occitanie)",
-      "url": "cas.mon-ent-occitanie.fr",
-      "py": "occitanie_toulouse"
-    },
-    {
-      "name": "Académie de Toulouse (Mon ENT Occitanie) via ÉduConnect",
       "url": "cas.mon-ent-occitanie.fr",
       "py": "occitanie_toulouse_edu",
       "educonnect": true
@@ -208,12 +197,12 @@
     },
     {
       "name": "Mon Collège (Essonne)",
-      "url": "moncollege-ent.var.fr",
+      "url": "www.moncollege-ent.essonne.fr",
       "py": "ent_essonne"
     },
     {
       "name": "Mon Collège (Var)",
-      "url": "cas.moncollege.valdoise.fr",
+      "url": "moncollege-ent.var.fr",
       "py": "ent_var"
     },
     {
