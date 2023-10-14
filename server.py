@@ -1115,7 +1115,6 @@ def discussions(token: str, response):
 			discussionData = {
 				"subject": discussion.subject,
 				"creator": discussion.creator,
-				"participants": discussion.participants,
 				"date": discussion.date.strftime("%Y-%m-%d %H:%M") if discussion.date is not None else None,
 				"unread": discussion.unread,
 				"closed": discussion.close,
