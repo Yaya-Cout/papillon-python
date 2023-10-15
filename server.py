@@ -1034,6 +1034,14 @@ def news(token: str, response):
 
 		newsAllData = []
 		for news in allNews:
+			local_id = ""
+
+			# return a combination of the 20 first letters of content, 2 first letters of title and the date
+
+			local_id += news.title[:3]
+
+			local_id += news.creation_date.strftime("%Y-%m-%d_%H:%M")
+
 			attachments = []
 			if news.attachments is not None:
 				for attachment in news.attachments:
@@ -1046,6 +1054,7 @@ def news(token: str, response):
 
 			newsData = {
 				"id": news.id,
+				"local_id": local_id,
 				"title": news.title,
 				"date": news.creation_date.strftime("%Y-%m-%d %H:%M"),
 				"category": news.category,
@@ -1065,6 +1074,58 @@ def news(token: str, response):
 		response.status = falcon.get_http_status(498)
 		return success
 
+@hug.post('/news/markAsRead')
+def read_news(token: str, newsId: str, response):
+	"""
+	Change l'état de lecture d'une actualité.
+
+	Args:
+		token (str): Le token du client Pronote
+		newsId (str): L'identifiant de l'actualité
+		response (falcon.Response): La réponse de la requête
+
+	Returns:
+
+	"""
+
+	success, client = get_client(token)
+	if success == 'ok':
+		if client.logged_in:
+			try:
+				allNews = client.information_and_surveys()
+
+				for news in allNews:
+					local_id = ""
+
+					# return a combination of the 20 first letters of content, 2 first letters of title and the date
+
+					local_id += news.title[:3]
+					local_id += news.creation_date.strftime("%Y-%m-%d_%H:%M")
+
+					if local_id == newsId:
+						current_state = news.read
+
+						news.mark_as_read(True)
+						current_state = True
+							
+						return {
+							"status": "ok",
+							"current_state": current_state,
+							"error": None
+						}
+					
+				response.status = falcon.get_http_status(404)
+				return {
+					"status": "not found",
+					"error": "L'actualité n'a pas été trouvée."
+				}
+	
+			except Exception as e:
+				response.status = falcon.get_http_status(500)
+				return {
+					"status": "error",
+					"error": str(e)
+				}
 
 @hug.get('/discussions')
 def discussions(token: str, response):
@@ -1616,11 +1677,17 @@ def set_homework_as_done(token: str, dateFrom: str, dateTo: str, homeworkId: str
 
 					changed = False
 					if local_id == homeworkId:
-						if homework.done: homework.set_done(False)
-						else: homework.set_done(True)
+						current_state = homework.done
+						if homework.done:
+							homework.set_done(False)
+							current_state = False
+						else:
+							homework.set_done(True)
+							current_state = True
 						changed = True
 						return {
 							"status": "ok",
+							"current_state": current_state,
 							"error": None
 						}
 				if not changed:
