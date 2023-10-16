@@ -1662,7 +1662,8 @@ def set_homework_as_done(token: str, dateFrom: str, dateTo: str, homeworkId: str
 		if client.logged_in:
 			try:
 				homeworks = client.homework(date_from=dateFrom, date_to=dateTo)
-				
+				changed = False
+
 				for homework in homeworks:
 					local_id = ""
 
@@ -1674,8 +1675,7 @@ def set_homework_as_done(token: str, dateFrom: str, dateTo: str, homeworkId: str
 					
 					local_id += homework.subject.name[:2]
 					local_id += homework.date.strftime("%Y-%m-%d_%H:%M")
-
-					changed = False
+					
 					if local_id == homeworkId:
 						current_state = homework.done
 						if homework.done:
