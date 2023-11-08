@@ -1106,7 +1106,7 @@ def read_news(token: str, newsId: str, response):
 						current_state = news.read
 
 						news.mark_as_read(not news.read)
-						current_state = True
+						current_state = not news.read
 							
 						return {
 							"status": "ok",
