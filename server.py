@@ -1121,8 +1121,8 @@ def read_news(token: str, newsId: str, response):
 					if local_id == newsId:
 						current_state = news.read
 
-						news.mark_as_read(True)
-						current_state = True
+						news.mark_as_read(not news.read)
+						current_state = not news.read
 							
 						return {
 							"status": "ok",
