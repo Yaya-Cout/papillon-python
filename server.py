@@ -435,6 +435,16 @@ def timetable(token: str, dateString: str, response):
 
 			lessonsData = []
 			for lesson in lessons:
+				files = []
+
+				for file in lesson.content.files:
+					files.append({
+						"id": file.id,
+						"name": file.name,
+						"url": file.url,
+						"type": file.type
+					})
+
 				lessonData = {
 					"id": lesson.id,
 					"num": lesson.num,
@@ -447,6 +457,12 @@ def timetable(token: str, dateString: str, response):
 					"rooms": lesson.classrooms,
 					"group_names": lesson.group_names,
 					"memo": lesson.memo,
+					"content": {
+						"title": lesson.content.title,
+						"description": lesson.content.description,
+						"category": lesson.content.category,
+						"files": files
+					},
 					"virtual": lesson.virtual_classrooms,
 					"start": lesson.start.strftime("%Y-%m-%d %H:%M"),
 					"end": lesson.end.strftime("%Y-%m-%d %H:%M"),
