@@ -93,7 +93,7 @@ def infos():
 # token = POST /generatetoken body={url, username, password, ent}
 # GET * token=token
 @hug.post('/generatetoken')
-def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode', 'token'])='url'):
+def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode', 'token'])='url', type: hug.types.one_of(['eleve', 'parent'])='eleve'):
 	if MAINTENANCE['enable']:
 		response.status = falcon.get_http_status(503)
 		return {
@@ -117,9 +117,15 @@ def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode
 
 			try:
 				if noENT:
-					client = pronotepy.Client(body['url'], username=body['username'], password=body['password'])
+					if type == 'parent':
+						client = pronotepy.ParentClient(body['url'], username=body['username'], password=body['password'])
+					else:
+						client = pronotepy.Client(body['url'], username=body['username'], password=body['password'])
 				else:
-					client = pronotepy.Client(body['url'], username=body['username'], password=body['password'], ent=getattr(pronotepy.ent, body['ent']))
+					if type == 'parent':
+						client = pronotepy.ParentClient(body['url'], username=body['username'], password=body['password'], ent=getattr(pronotepy.ent, body['ent']))
+					else:
+						client = pronotepy.Client(body['url'], username=body['username'], password=body['password'], ent=getattr(pronotepy.ent, body['ent']))
 			except Exception as e:
 				response.status = falcon.get_http_status(498)
 				print(f"Error while trying to connect to {body['url']}")
@@ -373,23 +379,59 @@ def user(token: str, response):
 				})
 
 			etabData = ""
-
 			try:
 				etabData = client.info.establishment
-			except KeyError:
+			except Exception as err:
 				etabData = ""
+
+			phone = ""
+			try:
+				phone = client.info.phone
+			except Exception as err:
+				phone = ""
+
+			email = ""
+			try:
+				email = client.info.email
+			except Exception as err:
+				email = ""
+
+			address = []
+			try:
+				address = client.info.address
+			except Exception as err:
+				address = []
+
+			ine_number = ""
+			try:
+				ine_number = client.info.ine_number
+			except Exception as err:
+				ine_number = ""
+
+			usertype = type(client).__name__
+
+			children = []
+			if (usertype == "ParentClient"):
+				try:
+					children = client.children.to_dict()
+				except Exception as err:
+					children = []
 
 			userData = {
 				"name": client.info.name,
 				"class": client.info.class_name,
 				"establishment": etabData,
-				"phone": client.info.phone,
-				"email": client.info.email,
-				"address": client.info.address,
-				"ine": client.info.ine_number,
+				"phone": phone,
+				"email": email,
+				"address": address,
+				"ine": ine_number,
 				"profile_picture": client.info.profile_picture.url if client.info.profile_picture else None,
 				"delegue": client.info.delegue,
-				"periods": periods
+				"periods": periods,
+				"client": {
+					"type": usertype,
+					"children": children
+				}
 			}
 
 			return userData
