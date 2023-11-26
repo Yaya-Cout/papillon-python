@@ -372,10 +372,17 @@ def user(token: str, response):
 					'actual': client.calculated_period.id == period.id
 				})
 
+			etabData = ""
+
+			try:
+				etabData = client.info.establishment
+			except KeyError:
+				etabData = ""
+
 			userData = {
 				"name": client.info.name,
 				"class": client.info.class_name,
-				"establishment": client.info.establishment,
+				"establishment": etabData,
 				"phone": client.info.phone,
 				"email": client.info.email,
 				"address": client.info.address,
