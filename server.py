@@ -8,7 +8,7 @@ import secrets
 import falcon
 import json
 import socket
-
+import base64
 
 import resource
 resource.setrlimit(resource.RLIMIT_CORE, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
@@ -93,7 +93,7 @@ def infos():
 # token = POST /generatetoken body={url, username, password, ent}
 # GET * token=token
 @hug.post('/generatetoken')
-def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode', 'token'])='url', type: hug.types.one_of(['eleve', 'parent'])='eleve'):
+def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode', 'token'])='url', type: hug.types.one_of(['eleve', 'parent'])='eleve', version: hug.types.one_of(['1', '2'])='1'):
 	if MAINTENANCE['enable']:
 		response.status = falcon.get_http_status(503)
 		return {
@@ -103,6 +103,21 @@ def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode
 
 	if not body is None:
 		noENT = False
+
+		# version 2 uses base64
+		if version == '2':
+			try :
+				body['url'] = base64.b64decode(body['url']).decode('utf-8')
+				body['username'] = base64.b64decode(body['username']).decode('utf-8')
+				body['password'] = base64.b64decode(body['password']).decode('utf-8')
+				if 'ent' in body:
+					body['ent'] = base64.b64decode(body['ent']).decode('utf-8')
+			except Exception as e:
+				response.status = falcon.get_http_status(400)
+				return {
+					"token": False,
+					"error": f'Invalid base64'
+				}
 
 		if method == "url":
 			for rk in ('url', 'username', 'password', 'ent'):
