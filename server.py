@@ -1257,7 +1257,24 @@ def discussions(token: str, response):
 					"seen": message.seen
 				})
 
+			local_id = ""
+
+			try:
+				# return a combination of the 20 first letters of subject, 2 first letters of creator and the date
+				local_id += discussion.subject[:3]
+				local_id += discussion.creator[:3]
+				local_id += discussion.date.strftime("%Y-%m-%d_%H:%M")
+			except Exception as e:
+				local_id += discussion.date.strftime("%Y-%m-%d_%H:%M")
+
+			participants = []
+			try :
+				participants = discussion.participants()
+			except Exception as e:
+				participants = []
+
 			discussionData = {
+				"local_id": local_id,
 				"subject": discussion.subject,
 				"creator": discussion.creator,
 				"date": discussion.date.strftime("%Y-%m-%d %H:%M") if discussion.date is not None else None,
@@ -1265,6 +1282,7 @@ def discussions(token: str, response):
 				"closed": discussion.close,
 				"replyable": discussion.replyable,
 				"messages": messages,
+				"participants": participants
 			}
 
 			discussionsAllData.append(discussionData)
@@ -1294,7 +1312,17 @@ def delete_discussion(token: str, discussionId: str, response):
 		try:
 			allDiscussions = client.discussions()
 			for discussion in allDiscussions:
-				if discussion.id == discussionId:
+				local_id = ""
+
+				try:
+					# return a combination of the 20 first letters of subject, 2 first letters of creator and the date
+					local_id += discussion.subject[:3]
+					local_id += discussion.creator[:3]
+					local_id += discussion.date.strftime("%Y-%m-%d_%H:%M")
+				except Exception as e:
+					local_id += discussion.date.strftime("%Y-%m-%d_%H:%M")
+
+				if local_id == discussionId:
 					discussion.delete()
 					return {
 						"status": "ok",
@@ -1335,7 +1363,17 @@ def read_discussion(token: str, discussionId: str, response):
 		try:
 			allDiscussions = client.discussions()
 			for discussion in allDiscussions:
-				if discussion.id == discussionId:
+				local_id = ""
+
+				try:
+					# return a combination of the 20 first letters of subject, 2 first letters of creator and the date
+					local_id += discussion.subject[:3]
+					local_id += discussion.creator[:3]
+					local_id += discussion.date.strftime("%Y-%m-%d_%H:%M")
+				except Exception as e:
+					local_id += discussion.date.strftime("%Y-%m-%d_%H:%M")
+
+				if local_id == discussionId:
 					if discussion.unread == 0: discussion.mark_as(False)
 					else: discussion.mark_as(True)
 					return {
@@ -1378,7 +1416,17 @@ def reply_discussion(token: str, discussionId: str, content: str, response):
 		try:
 			allDiscussions = client.discussions()
 			for discussion in allDiscussions:
-				if discussion.id == discussionId:
+				local_id = ""
+
+				try:
+					# return a combination of the 20 first letters of subject, 2 first letters of creator and the date
+					local_id += discussion.subject[:3]
+					local_id += discussion.creator[:3]
+					local_id += discussion.date.strftime("%Y-%m-%d_%H:%M")
+				except Exception as e:
+					local_id += discussion.date.strftime("%Y-%m-%d_%H:%M")
+
+				if local_id == discussionId:
 					if discussion.replyable:
 						discussion.reply(content)
 						return {
