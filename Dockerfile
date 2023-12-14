@@ -2,6 +2,7 @@ FROM python:3.11.3-alpine
 
 # Set environment variable
 ENV CRON "*/25 * * * *"
+ENV DSN_URL "http://server:port"
 
 # Install dependencies
 RUN apk update && \
