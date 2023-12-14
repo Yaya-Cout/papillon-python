@@ -9,6 +9,7 @@ import secrets
 import falcon
 import json
 import socket
+import base64
 import sentry_sdk
 
 import resource
@@ -99,7 +100,7 @@ def infos():
 # token = POST /generatetoken body={url, username, password, ent}
 # GET * token=token
 @hug.post('/generatetoken')
-def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode', 'token'])='url'):
+def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode', 'token'])='url', type: hug.types.one_of(['eleve', 'parent'])='eleve', version: hug.types.one_of(['1', '2'])='1'):
 	if MAINTENANCE['enable']:
 		response.status = falcon.get_http_status(503)
 		return {
@@ -109,6 +110,21 @@ def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode
 
 	if not body is None:
 		noENT = False
+
+		# version 2 uses base64
+		if version == '2':
+			try :
+				body['url'] = base64.b64decode(body['url']).decode('utf-8')
+				body['username'] = base64.b64decode(body['username']).decode('utf-8')
+				body['password'] = base64.b64decode(body['password']).decode('utf-8')
+				if 'ent' in body:
+					body['ent'] = base64.b64decode(body['ent']).decode('utf-8')
+			except Exception as e:
+				response.status = falcon.get_http_status(400)
+				return {
+					"token": False,
+					"error": f'Invalid base64'
+				}
 
 		if method == "url":
 			for rk in ('url', 'username', 'password', 'ent'):
@@ -123,9 +139,15 @@ def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode
 
 			try:
 				if noENT:
-					client = pronotepy.Client(body['url'], username=body['username'], password=body['password'])
+					if type == 'parent':
+						client = pronotepy.ParentClient(body['url'], username=body['username'], password=body['password'])
+					else:
+						client = pronotepy.Client(body['url'], username=body['username'], password=body['password'])
 				else:
-					client = pronotepy.Client(body['url'], username=body['username'], password=body['password'], ent=getattr(pronotepy.ent, body['ent']))
+					if type == 'parent':
+						client = pronotepy.ParentClient(body['url'], username=body['username'], password=body['password'], ent=getattr(pronotepy.ent, body['ent']))
+					else:
+						client = pronotepy.Client(body['url'], username=body['username'], password=body['password'], ent=getattr(pronotepy.ent, body['ent']))
 			except Exception as e:
 				response.status = falcon.get_http_status(498)
 				print(f"Error while trying to connect to {body['url']}")
@@ -378,17 +400,60 @@ def user(token: str, response):
 					'actual': client.calculated_period.id == period.id
 				})
 
+			etabData = ""
+			try:
+				etabData = client.info.establishment
+			except Exception as err:
+				etabData = ""
+
+			phone = ""
+			try:
+				phone = client.info.phone
+			except Exception as err:
+				phone = ""
+
+			email = ""
+			try:
+				email = client.info.email
+			except Exception as err:
+				email = ""
+
+			address = []
+			try:
+				address = client.info.address
+			except Exception as err:
+				address = []
+
+			ine_number = ""
+			try:
+				ine_number = client.info.ine_number
+			except Exception as err:
+				ine_number = ""
+
+			usertype = type(client).__name__
+
+			children = []
+			if (usertype == "ParentClient"):
+				try:
+					children = client.children.to_dict()
+				except Exception as err:
+					children = []
+
 			userData = {
 				"name": client.info.name,
 				"class": client.info.class_name,
-				"establishment": client.info.establishment,
-				"phone": client.info.phone,
-				"email": client.info.email,
-				"address": client.info.address,
-				"ine": client.info.ine_number,
+				"establishment": etabData,
+				"phone": phone,
+				"email": email,
+				"address": address,
+				"ine": ine_number,
 				"profile_picture": client.info.profile_picture.url if client.info.profile_picture else None,
 				"delegue": client.info.delegue,
-				"periods": periods
+				"periods": periods,
+				"client": {
+					"type": usertype,
+					"children": children
+				}
 			}
 
 			return userData
@@ -441,6 +506,25 @@ def timetable(token: str, dateString: str, response):
 
 			lessonsData = []
 			for lesson in lessons:
+				files = []
+				lessonContent = []
+
+				if lesson.content != None:
+					for file in lesson.content.files:
+						files.append({
+							"id": file.id,
+							"name": file.name,
+							"url": file.url,
+							"type": file.type
+						})
+
+					lessonContent = {
+						"title": lesson.content.title,
+						"description": lesson.content.description,
+						"category": lesson.content.category,
+						"files": files
+					}
+
 				lessonData = {
 					"id": lesson.id,
 					"num": lesson.num,
@@ -453,6 +537,7 @@ def timetable(token: str, dateString: str, response):
 					"rooms": lesson.classrooms,
 					"group_names": lesson.group_names,
 					"memo": lesson.memo,
+					"content": lessonContent,
 					"virtual": lesson.virtual_classrooms,
 					"start": lesson.start.strftime("%Y-%m-%d %H:%M"),
 					"end": lesson.end.strftime("%Y-%m-%d %H:%M"),
@@ -1040,6 +1125,14 @@ def news(token: str, response):
 
 		newsAllData = []
 		for news in allNews:
+			local_id = ""
+
+			# return a combination of the 20 first letters of content, 2 first letters of title and the date
+
+			local_id += news.title[:3]
+
+			local_id += news.creation_date.strftime("%Y-%m-%d_%H:%M")
+
 			attachments = []
 			if news.attachments is not None:
 				for attachment in news.attachments:
@@ -1052,6 +1145,7 @@ def news(token: str, response):
 
 			newsData = {
 				"id": news.id,
+				"local_id": local_id,
 				"title": news.title,
 				"date": news.creation_date.strftime("%Y-%m-%d %H:%M"),
 				"category": news.category,
@@ -1071,6 +1165,58 @@ def news(token: str, response):
 		response.status = falcon.get_http_status(498)
 		return success
 
+@hug.post('/news/markAsRead')
+def read_news(token: str, newsId: str, response):
+	"""
+	Change l'état de lecture d'une actualité.
+
+	Args:
+		token (str): Le token du client Pronote
+		newsId (str): L'identifiant de l'actualité
+		response (falcon.Response): La réponse de la requête
+
+	Returns:
+
+	"""
+
+	success, client = get_client(token)
+	if success == 'ok':
+		if client.logged_in:
+			try:
+				allNews = client.information_and_surveys()
+
+				for news in allNews:
+					local_id = ""
+
+					# return a combination of the 20 first letters of content, 2 first letters of title and the date
+
+					local_id += news.title[:3]
+					local_id += news.creation_date.strftime("%Y-%m-%d_%H:%M")
+
+					if local_id == newsId:
+						current_state = news.read
+
+						news.mark_as_read(not news.read)
+						current_state = not news.read
+							
+						return {
+							"status": "ok",
+							"current_state": current_state,
+							"error": None
+						}
+					
+				response.status = falcon.get_http_status(404)
+				return {
+					"status": "not found",
+					"error": "L'actualité n'a pas été trouvée."
+				}
+	
+			except Exception as e:
+				response.status = falcon.get_http_status(500)
+				return {
+					"status": "error",
+					"error": str(e)
+				}
 
 @hug.get('/discussions')
 def discussions(token: str, response):
@@ -1118,15 +1264,32 @@ def discussions(token: str, response):
 					"seen": message.seen
 				})
 
+			local_id = ""
+
+			try:
+				# return a combination of the 20 first letters of subject, 2 first letters of creator and the date
+				local_id += discussion.subject[:3]
+				local_id += discussion.creator[:3]
+				local_id += discussion.date.strftime("%Y-%m-%d_%H:%M")
+			except Exception as e:
+				local_id += discussion.date.strftime("%Y-%m-%d_%H:%M")
+
+			participants = []
+			try :
+				participants = discussion.participants()
+			except Exception as e:
+				participants = []
+
 			discussionData = {
+				"local_id": local_id,
 				"subject": discussion.subject,
 				"creator": discussion.creator,
-				"participants": discussion.participants,
 				"date": discussion.date.strftime("%Y-%m-%d %H:%M") if discussion.date is not None else None,
 				"unread": discussion.unread,
 				"closed": discussion.close,
 				"replyable": discussion.replyable,
 				"messages": messages,
+				"participants": participants
 			}
 
 			discussionsAllData.append(discussionData)
@@ -1156,7 +1319,17 @@ def delete_discussion(token: str, discussionId: str, response):
 		try:
 			allDiscussions = client.discussions()
 			for discussion in allDiscussions:
-				if discussion.id == discussionId:
+				local_id = ""
+
+				try:
+					# return a combination of the 20 first letters of subject, 2 first letters of creator and the date
+					local_id += discussion.subject[:3]
+					local_id += discussion.creator[:3]
+					local_id += discussion.date.strftime("%Y-%m-%d_%H:%M")
+				except Exception as e:
+					local_id += discussion.date.strftime("%Y-%m-%d_%H:%M")
+
+				if local_id == discussionId:
 					discussion.delete()
 					return {
 						"status": "ok",
@@ -1197,7 +1370,17 @@ def read_discussion(token: str, discussionId: str, response):
 		try:
 			allDiscussions = client.discussions()
 			for discussion in allDiscussions:
-				if discussion.id == discussionId:
+				local_id = ""
+
+				try:
+					# return a combination of the 20 first letters of subject, 2 first letters of creator and the date
+					local_id += discussion.subject[:3]
+					local_id += discussion.creator[:3]
+					local_id += discussion.date.strftime("%Y-%m-%d_%H:%M")
+				except Exception as e:
+					local_id += discussion.date.strftime("%Y-%m-%d_%H:%M")
+
+				if local_id == discussionId:
 					if discussion.unread == 0: discussion.mark_as(False)
 					else: discussion.mark_as(True)
 					return {
@@ -1240,7 +1423,17 @@ def reply_discussion(token: str, discussionId: str, content: str, response):
 		try:
 			allDiscussions = client.discussions()
 			for discussion in allDiscussions:
-				if discussion.id == discussionId:
+				local_id = ""
+
+				try:
+					# return a combination of the 20 first letters of subject, 2 first letters of creator and the date
+					local_id += discussion.subject[:3]
+					local_id += discussion.creator[:3]
+					local_id += discussion.date.strftime("%Y-%m-%d_%H:%M")
+				except Exception as e:
+					local_id += discussion.date.strftime("%Y-%m-%d_%H:%M")
+
+				if local_id == discussionId:
 					if discussion.replyable:
 						discussion.reply(content)
 						return {
@@ -1608,7 +1801,8 @@ def set_homework_as_done(token: str, dateFrom: str, dateTo: str, homeworkId: str
 		if client.logged_in:
 			try:
 				homeworks = client.homework(date_from=dateFrom, date_to=dateTo)
-				
+				changed = False
+
 				for homework in homeworks:
 					local_id = ""
 
@@ -1620,14 +1814,19 @@ def set_homework_as_done(token: str, dateFrom: str, dateTo: str, homeworkId: str
 					
 					local_id += homework.subject.name[:2]
 					local_id += homework.date.strftime("%Y-%m-%d_%H:%M")
-
-					changed = False
+					
 					if local_id == homeworkId:
-						if homework.done: homework.set_done(False)
-						else: homework.set_done(True)
+						current_state = homework.done
+						if homework.done:
+							homework.set_done(False)
+							current_state = False
+						else:
+							homework.set_done(True)
+							current_state = True
 						changed = True
 						return {
 							"status": "ok",
+							"current_state": current_state,
 							"error": None
 						}
 				if not changed:
