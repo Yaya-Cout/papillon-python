@@ -8,7 +8,7 @@ start_api() {
     pip uninstall pronotepy -y
     git clone -b development https://github.com/PapillonApp/papillon-python
     pip3.11 install -U https://github.com/bain3/pronotepy/archive/refs/heads/master.zip
-    pip3.11 install -U lxml hug sentry-sdk==0.10.2
+    pip3.11 install -U lxml hug sentry-sdk
     cd papillon-python
     echo "Papillon    ^|^e   Lancement de l'API"
     python3.11 -m hug -f server.py
