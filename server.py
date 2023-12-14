@@ -24,7 +24,7 @@ CAS_LIST = json.load(open('cas_list.json', 'r', encoding='utf8'))
 
 sentry_sdk.init(
 	dsn=environ['DSN_URL'],
-	release=f'papillon-api@{API_VERSION}'
+	release=API_VERSION,
 )
 
 # ajouter les CORS sur toutes les routes
