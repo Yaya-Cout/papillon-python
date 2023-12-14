@@ -1,5 +1,6 @@
 # importe les modules importants
 from pyexpat.errors import messages
+from os import environ
 import hug
 import pronotepy
 import datetime
@@ -8,7 +9,7 @@ import secrets
 import falcon
 import json
 import socket
-
+import sentry_sdk
 
 import resource
 resource.setrlimit(resource.RLIMIT_CORE, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
@@ -19,6 +20,11 @@ from pronotepy.ent import *
 API_VERSION = open('VERSION', 'r').read().strip()
 MAINTENANCE = json.load(open('maintenance.json', 'r', encoding='utf8'))
 CAS_LIST = json.load(open('cas_list.json', 'r', encoding='utf8'))
+
+sentry_sdk.init(
+	dsn=environ['DSN_URL'],
+	release=f'papillon-api@{API_VERSION}'
+)
 
 # ajouter les CORS sur toutes les routes
 @hug.response_middleware()

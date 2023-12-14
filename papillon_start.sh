@@ -9,6 +9,7 @@ start_api() {
         pip3.11 install -U https://github.com/bain3/pronotepy/archive/refs/heads/master.zip
         pip3.11 install -U lxml
         pip3.11 install -U hug
+        pip3.11 install -U sentry-sdk
         cd papillon-python
         rm maintenance.json
         wget https://cdn.tryon-lab.fr/papillon/maintenance.json 
