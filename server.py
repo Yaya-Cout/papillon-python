@@ -33,12 +33,16 @@ denylist = DEFAULT_DENYLIST + [
 	"login",
 ] 
 
-sentry_sdk.init(
-	dsn=environ['DSN_URL'],
-	release=API_VERSION,
-	send_default_pii=True,
-	event_scrubber=EventScrubber(denylist=denylist),
-)
+try :
+	sentry_sdk.init(
+		dsn=environ['DSN_URL'],
+		release=API_VERSION,
+		send_default_pii=True,
+		event_scrubber=EventScrubber(denylist=denylist),
+	)
+except Exception as e:
+	print("WARN: Couldn't init Sentry")
+	print(e)
 
 # ajouter les CORS sur toutes les routes
 @hug.response_middleware()
