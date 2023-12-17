@@ -2,6 +2,7 @@ FROM python:3.11.3-alpine
 
 # Set environment variable
 ENV CRON "*/25 * * * *"
+ENV DSN_URL "http://server:port"
 
 # Install dependencies
 RUN apk update && \
@@ -20,7 +21,8 @@ RUN apk update && \
     bzip2-dev \
     zlib-dev \
     nodejs \
-    npm
+    npm && \
+    rm -rf /var/cache/apk/*
 
 # Install pm2
 RUN npm install -g pm2
@@ -31,5 +33,5 @@ RUN mkdir -p /hosting/papillon && \
     chmod +x /hosting/papillon/start.sh
 
 CMD cd /hosting/papillon/ && \
-    pm2 start --name "Papillon" /hosting/papillon/start.sh --cron-restart="$CRON" && \
-    pm2 logs
+    pm2 start --name "Papillon" /hosting/papillon/start.sh --cron-restart="$CRON" --log /hosting/papillon/logs.txt && \
+    tail -f /hosting/papillon/logs.txt

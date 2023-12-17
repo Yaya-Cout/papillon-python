@@ -1,5 +1,6 @@
 # importe les modules importants
 from pyexpat.errors import messages
+from os import environ
 import hug
 import pronotepy
 import datetime
@@ -10,6 +11,9 @@ import json
 import socket
 import base64
 
+import sentry_sdk
+from sentry_sdk.scrubber import EventScrubber, DEFAULT_DENYLIST 
+
 import resource
 resource.setrlimit(resource.RLIMIT_CORE, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
 
@@ -19,6 +23,22 @@ from pronotepy.ent import *
 API_VERSION = open('VERSION', 'r').read().strip()
 MAINTENANCE = json.load(open('maintenance.json', 'r', encoding='utf8'))
 CAS_LIST = json.load(open('cas_list.json', 'r', encoding='utf8'))
+
+denylist = DEFAULT_DENYLIST + [
+	"token"
+	"qrToken",
+	"checkCode",
+	"uuid",
+	"password",
+	"login",
+] 
+
+sentry_sdk.init(
+	dsn=environ['DSN_URL'],
+	release=API_VERSION,
+	send_default_pii=True,
+	event_scrubber=EventScrubber(denylist=denylist),
+)
 
 # ajouter les CORS sur toutes les routes
 @hug.response_middleware()
