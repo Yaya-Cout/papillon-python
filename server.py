@@ -490,33 +490,45 @@ def timetable(token: str, dateString: str, response):
 		}]
 	"""
 	
-	dateToGet = datetime.datetime.strptime(dateString, "%Y-%m-%d").date()
+	dateToGet = None
+
+	try :
+		dateToGet = datetime.datetime.strptime(dateString, "%Y-%m-%d").date()
+	except Exception as e:
+		dateToGet = datetime.datetime.now().date()
 	success, client = get_client(token)
 
 	if success == 'ok':
 		if client.logged_in:
-			lessons = client.lessons(dateToGet)
+			lessons = []
+			try :
+				lessons = client.lessons(dateToGet)
+			except Exception as e:
+				lessons = []
 
 			lessonsData = []
 			for lesson in lessons:
 				files = []
 				lessonContent = []
 
-				if lesson.content != None:
-					for file in lesson.content.files:
-						files.append({
-							"id": file.id,
-							"name": file.name,
-							"url": file.url,
-							"type": file.type
-						})
+				try :
+					if lesson.content != None:
+						for file in lesson.content.files:
+							files.append({
+								"id": file.id,
+								"name": file.name,
+								"url": file.url,
+								"type": file.type
+							})
 
-					lessonContent = {
-						"title": lesson.content.title,
-						"description": lesson.content.description,
-						"category": lesson.content.category,
-						"files": files
-					}
+						lessonContent = {
+							"title": lesson.content.title,
+							"description": lesson.content.description,
+							"category": lesson.content.category,
+							"files": files
+						}
+				except Exception as e:
+					lessonContent = []
 
 				lessonData = {
 					"id": lesson.id,
@@ -1114,7 +1126,11 @@ def news(token: str, response):
  
 	success, client = get_client(token)
 	if success == 'ok':
-		allNews = client.information_and_surveys()
+		allNews = []
+		try :
+			allNews = client.information_and_surveys()
+		except Exception as e:
+			allNews = []
 
 		newsAllData = []
 		for news in allNews:
@@ -1122,7 +1138,10 @@ def news(token: str, response):
 
 			# return a combination of the 20 first letters of content, 2 first letters of title and the date
 
-			local_id += news.title[:3]
+			try :
+				local_id += news.title[:3]
+			except Exception as e:
+				local_id += ""
 
 			local_id += news.creation_date.strftime("%Y-%m-%d_%H:%M")
 
@@ -1243,7 +1262,11 @@ def discussions(token: str, response):
 	
 	success, client = get_client(token)
 	if success == 'ok':
-		allDiscussions = client.discussions()
+		allDiscussions = []
+		try :
+			allDiscussions = client.discussions()
+		except Exception as e:
+			allDiscussions = []
 
 		discussionsAllData = []
 		for discussion in allDiscussions:
@@ -1793,7 +1816,11 @@ def set_homework_as_done(token: str, dateFrom: str, dateTo: str, homeworkId: str
 	if success == 'ok':
 		if client.logged_in:
 			try:
-				homeworks = client.homework(date_from=dateFrom, date_to=dateTo)
+				homeworks = []
+				try :
+					homeworks = client.homework(date_from=dateFrom, date_to=dateTo)
+				except Exception as e:
+					homeworks = []
 				changed = False
 
 				for homework in homeworks:
