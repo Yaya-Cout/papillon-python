@@ -3,7 +3,7 @@
 echo "Papillon    ^=^z    EN COURS : Mise à jour du repo api Papillon"
 
 start_api() {
-    kill $(lsof -ti:8000)
+    kill -9 $(fuser -k -n tcp 8000)
     rm -rf papillon-python
     pip install --upgrade pip
     pip uninstall pronotepy -y
