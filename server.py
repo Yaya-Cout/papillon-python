@@ -1642,7 +1642,11 @@ def evaluations(token: str, response):
 	
 	success, client = get_client(token)
 	if success == 'ok':
-		allEvaluations = client.calculated_period.evaluations
+		allEvaluations = []
+		try :
+			allEvaluations = client.calculated_period.evaluations
+		except Exception as e:
+			allEvaluations = []
 
 		evaluationsAllData = []
 		for evaluation in allEvaluations:
