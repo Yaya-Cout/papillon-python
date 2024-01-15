@@ -3,6 +3,7 @@
 echo "Papillon    ^=^z    EN COURS : Mise à jour du repo api Papillon"
 
 start_api() {
+    kill -9 $(netstat -nlp | awk '/:8000/ {split($NF,a,"/"); print a[1]}')
     rm -rf papillon-python
     pip install --upgrade pip
     pip uninstall pronotepy -y
