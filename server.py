@@ -839,7 +839,11 @@ def grades(token: str, response):
 	
 	success, client = get_client(token)
 	if success == 'ok':
-		allGrades = client.calculated_period.grades
+		allGrades = []
+		try :
+			allGrades = client.calculated_period.grades
+		except Exception as e:
+			allGrades = []
 		gradesData = []
 		for grade in allGrades:
 			gradeData = {
@@ -1527,7 +1531,11 @@ def recipients(token: str, response):
 	
 	success, client = get_client(token)
 	if success == 'ok':
-		allRecipients = client.get_recipients()
+		allRecipients = []
+		try:
+			allRecipients = client.get_recipients()
+		except Exception as e:
+			allRecipients = []
 
 		recipientsAllData = []
 		for recipient in allRecipients:
