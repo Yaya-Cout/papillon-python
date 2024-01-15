@@ -666,8 +666,12 @@ def homework(token: str, dateFrom: str, dateTo: str, response):
 		}
 	"""
 	
-	dateFrom = datetime.datetime.strptime(dateFrom, "%Y-%m-%d").date()
-	dateTo = datetime.datetime.strptime(dateTo, "%Y-%m-%d").date()
+	try :
+		dateFrom = datetime.datetime.strptime(dateFrom, "%Y-%m-%d").date()
+		dateTo = datetime.datetime.strptime(dateTo, "%Y-%m-%d").date()
+	except Exception as e:
+		dateFrom = datetime.datetime.now().date()
+		dateTo = datetime.datetime.now().date()
 	success, client = get_client(token)
 
 	if success == 'ok':
@@ -1769,8 +1773,12 @@ def menu(token: str, dateFrom: str, dateTo: str, response):
 		}]
 	"""
 	
-	dateFrom = datetime.datetime.strptime(dateFrom, "%Y-%m-%d").date()
-	dateTo = datetime.datetime.strptime(dateTo, "%Y-%m-%d").date()
+	try :
+		dateFrom = datetime.datetime.strptime(dateFrom, "%Y-%m-%d").date()
+		dateTo = datetime.datetime.strptime(dateTo, "%Y-%m-%d").date()
+	except Exception as e:
+		dateFrom = datetime.datetime.now().date()
+		dateTo = datetime.datetime.now().date()
 	success, client = get_client(token)
 	if success == 'ok':
 		allMenus = client.menus(date_from=dateFrom, date_to=dateTo)
@@ -1845,8 +1853,12 @@ def set_homework_as_done(token: str, dateFrom: str, dateTo: str, homeworkId: str
 		str: 'ok' si tout s'est bien passé, 'not found' si le devoir n'a pas été trouvé, 'error' si une erreur est survenue.
 	"""
 	
-	dateFrom = datetime.datetime.strptime(dateFrom, "%Y-%m-%d").date()
-	dateTo = datetime.datetime.strptime(dateTo, "%Y-%m-%d").date()
+	try :
+		dateFrom = datetime.datetime.strptime(dateFrom, "%Y-%m-%d").date()
+		dateTo = datetime.datetime.strptime(dateTo, "%Y-%m-%d").date()
+	except Exception as e:
+		dateFrom = datetime.datetime.now().date()
+		dateTo = datetime.datetime.now().date()
 	success, client = get_client(token)
 
 	if success == 'ok':
