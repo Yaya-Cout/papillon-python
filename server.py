@@ -10,6 +10,10 @@ import falcon
 import json
 import socket
 import base64
+import redis
+import pickle
+
+from redis.commands.json.path import Path
 
 import sentry_sdk
 from sentry_sdk.scrubber import EventScrubber, DEFAULT_DENYLIST 
@@ -44,6 +48,13 @@ except Exception as e:
 	print("WARN: Couldn't init Sentry")
 	print(e)
 
+
+try:
+	r = redis.Redis(host='localhost', port=6379, decode_responses=True)
+except Exception as e:
+	raise Exception("Couldn't connect to Redis"
+				"\nPlease make sure that Redis is running on port 6379")
+	
 # ajouter les CORS sur toutes les routes
 @hug.response_middleware()
 def CORS(request, response, resource):
@@ -66,7 +77,7 @@ def CORS(request, response, resource):
 		response.status_code = hug.HTTP_204
 
 # système de tokens
-saved_clients = {}
+#saved_clients = {}
 """
 saved_clients ->
 	token ->
@@ -90,14 +101,19 @@ def get_client(token: str) -> tuple[str, pronotepy.Client|None]:
 	"""
 	if MAINTENANCE['enable']:
 		return 'maintenance', None
-	if token in saved_clients:
-		client_dict = saved_clients[token]
-		if time.time() - client_dict['last_interaction'] < client_timeout_threshold:
-			client_dict['last_interaction'] = time.time()
-			return 'ok', client_dict['client']
+	if r.exists(token):
+		#client_dict = saved_clients[token]
+		client_dict_last_interaction = float(r.get(f"{token}:last_interaction"))
+		if time.time() - client_dict_last_interaction < client_timeout_threshold:
+			r.json().set(token, Path('.last_interaction'), time.time())
+			json = r.get(f"{token}:client")
+			return 'ok', pickle.loads(base64.b64decode(json))
 		else:
-			del saved_clients[token]
-			print(len(saved_clients), 'valid tokens')
+			#del saved_clients[token]
+			r.delete(f"{token}:last_interaction")
+			r.delete(f"{token}:client")
+			#print(len(saved_clients), 'valid tokens')
+			print("Deleted.")
 			return 'expired', None
 	else:
 		return 'notfound', None
@@ -242,12 +258,17 @@ def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode
 		print(client.calculated_period)
 		client.activated_period = __get_current_period(client, False, None, True)
 
-		saved_clients[token] = {
-			'client': client,
+		client_pickle = base64.b64encode(pickle.dumps(client)).decode()
+
+		saved_client = {
+			'client': client_pickle,
 			'last_interaction': time.time()
 		}
 
-		print(len(saved_clients), 'valid tokens')
+		r.set(f"{token}:client", client_pickle)
+		r.set(f"{token}:last_interaction", time.time())
+
+		#print(len(saved_clients), 'valid tokens')
 
 		# if error return error
 		if client.logged_in:
