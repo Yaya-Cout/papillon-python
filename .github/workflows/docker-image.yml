@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - development  # Changer en la branche que vous souhaitez surveiller
-  workflow_dispatch: # Pour lancer manuellement
 
 jobs:
   build_and_publish:
@@ -31,7 +30,7 @@ jobs:
           docker buildx create --use
           docker buildx build \
             --file Dockerfile \
-            --tag yayacout/papillonserver:latest \
+            --tag justtryon/papillonserver:latest \
             --platform linux/amd64,linux/aarch64 \
             .
       
@@ -40,6 +39,6 @@ jobs:
           docker buildx create --use
           docker buildx build \
             --file Dockerfile \
-            --tag yayacout/papillonserver:latest \
+            --tag justtryon/papillonserver:latest \
             --platform linux/amd64,linux/aarch64 \
             --push .
