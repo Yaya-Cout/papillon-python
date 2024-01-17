@@ -5,7 +5,6 @@ import pronotepy
 import datetime
 import time
 import secrets
-import falcon
 import json
 import socket
 import base64
@@ -13,7 +12,7 @@ import redis
 import pickle
 from sanic import Sanic
 from sanic.response import json as rjson
-from sanic.exceptions import ServerError, NotFound, BadRequest
+from sanic.exceptions import ServerError, NotFound, BadRequest, Forbidden
 
 from redis.commands.json.path import Path
 
@@ -74,7 +73,7 @@ async def CORS(request, response):
         response.status = 204
 
 # système de tokens
-#saved_clients = {}
+saved_clients = {}
 """
 saved_clients ->
 	token ->
@@ -100,19 +99,14 @@ def get_client(token: str) -> tuple[str, pronotepy.Client|None]:
 	"""
 	if MAINTENANCE['enable']:
 		return 'maintenance', None
-	if r.exists(token):
-		#client_dict = saved_clients[token]
-		client_dict_last_interaction = float(r.get(f"{token}:last_interaction"))
-		if time.time() - client_dict_last_interaction < client_timeout_threshold:
-			r.json().set(token, Path('.last_interaction'), time.time())
-			json = r.get(f"{token}:client")
-			return 'ok', pickle.loads(base64.b64decode(json))
+	if token in saved_clients:
+		client_dict = saved_clients[token]
+		if time.time() - client_dict['last_interaction'] < client_timeout_threshold:
+			client_dict['last_interaction'] = time.time()
+			return 'ok', client_dict['client']
 		else:
-			#del saved_clients[token]
-			r.delete(f"{token}:last_interaction")
-			r.delete(f"{token}:client")
-			#print(len(saved_clients), 'valid tokens')
-			print("Deleted.")
+			del saved_clients[token]
+			print(len(saved_clients), 'valid tokens')
 			return 'expired', None
 	else:
 		return 'notfound', None
@@ -143,28 +137,33 @@ async def infos(request):
 # GET * token=token
 @app.route('/generatetoken', methods=['POST'])
 async def generate_token(request):
-	print("aaa")
-	body = request.json
-	method = body.get('method', 'url')
-	type = body.get('type', 'eleve') 
-	version = body.get('version', '1')
+	print("Generating token...")
+	body = request.form
+
+	
 
 	if not body is None:
+		method = body.get('method', 'url')
+		type = body.get('type', 'eleve') 
+		#version = body.get('version', '1')
+		print(body)
 		noENT = False
 
 		# version 2 uses base64
-		if version == '2':
-			try :
-				body['url'] = base64.b64decode(body['url']).decode('utf-8')
-				body['username'] = base64.b64decode(body['username']).decode('utf-8')
-				body['password'] = base64.b64decode(body['password']).decode('utf-8')
-				if 'ent' in body:
-					body['ent'] = base64.b64decode(body['ent']).decode('utf-8')
-			except Exception as e:
-				return rjson({
-					"token": False,
-					"error": 'Invalid base64'
-				}, status=400)
+		#if version == '2':
+		try :
+			print("Decoding base64...")
+			body['url'] = base64.b64decode(body['url'][0]).decode('utf-8')
+			body['username'] = base64.b64decode(body['username'][0]).decode('utf-8')
+			body['password'] = base64.b64decode(body['password'][0]).decode('utf-8')
+			if 'ent' in body:
+				body['ent'] = base64.b64decode(body['ent'][0]).decode('utf-8')
+		except Exception as e:
+			print(e)
+			return rjson({
+				"token": False,
+				"error": 'Invalid base64'
+			}, status=400)
 
 		if method == "url":
 			for rk in ('url', 'username', 'password', 'ent'):
@@ -217,6 +216,7 @@ async def generate_token(request):
 					"url": body['url']
 				}, body['checkCode'], body['uuid'])
 			except Exception as e:
+				print(e)                
 				return rjson({
 					"token": False,
 					"error": str(e),
@@ -225,6 +225,7 @@ async def generate_token(request):
 		elif method == "token":
 			for rk in ('url', 'username', 'password', 'uuid'):
 				if not rk in body:
+					print("Missing", rk)
 					return rjson({
 						"token": False,
 						"error": f'Missing {rk}'
@@ -247,7 +248,7 @@ async def generate_token(request):
 				}, status=498)
 
 		token = secrets.token_urlsafe(16)
-
+		print(token)
 		# Set current period
 		client.calculated_period = __get_current_period(client)
 		print(client.calculated_period)
@@ -255,8 +256,8 @@ async def generate_token(request):
 
 		client_pickle = base64.b64encode(pickle.dumps(client)).decode()
 
-		saved_client = {
-			'client': client_pickle,
+		saved_clients[token] = {
+			'client': client,
 			'last_interaction': time.time()
 		}
 
@@ -280,11 +281,10 @@ async def generate_token(request):
 
 				return QRtokenArray
 
-			tokenArray = {
+			return rjson({
 				"token": token,
 				"error": False
-			}
-			return tokenArray
+			})
 		else:
 			return rjson({
 				"token": False,
@@ -377,14 +377,14 @@ async def change_period(request):
         if client.logged_in:
             try:
                 client.calculated_period = __get_current_period(client, True, periodName)
-                return json({
+                return rjson({
                     'status': 'ok',
                     'period': client.calculated_period.name
                 })
             except Exception as e:
-                raise ServerError(str(e), status_code=500)
+                return rjson({"msg": success}, status=498)
     else:
-        raise ServerError(success, status_code=498)
+        return rjson({"msg": success}, status=498)
 
 
 @app.route('/user', methods=['GET'])
@@ -483,9 +483,9 @@ async def user(request):
                 }
             }
 
-            return json(userData)
+            return rjson(userData)
     else:
-        raise ServerError(success, status_code=498)
+        return rjson({"msg": success}, status=498)
 
 
 @app.route('/timetable', methods=['GET'])
@@ -532,6 +532,7 @@ async def timetable(request):
     except Exception as e:
         dateToGet = datetime.datetime.now().date()
     success, client = get_client(token)
+    print(token)
 
     if success == 'ok':
         if client.logged_in:
@@ -591,9 +592,9 @@ async def timetable(request):
                 }
                 lessonsData.append(lessonData)
 
-            return json(lessonsData)
+            return rjson(lessonsData)
     else:
-        raise ServerError(success, status_code=498)
+        return rjson({"msg": success}, status=498)
 
 @app.route('/content', methods=['GET'])
 async def content(request):
@@ -640,9 +641,9 @@ async def content(request):
 
                 contentData.append(contentList)
 
-            return json(contentData)
+            return rjson(contentData)
     else:
-        raise ServerError(success, status_code=498)
+        return rjson({"msg": success}, status=498)
 
 @app.route('/homework', methods=['GET'])
 async def homework(request):
@@ -712,9 +713,9 @@ async def homework(request):
                 }
                 homeworksData.append(homeworkData)
 
-            return json(homeworksData)
+            return rjson(homeworksData)
     else:
-        raise ServerError(success, status_code=498)
+        return rjson({"msg": success}, status=498)
 
 
 def __get_grade_state(grade_value:str, significant:bool = False) -> int|str :
@@ -859,9 +860,9 @@ async def grades(request):
             "class_overall_average": __transform_to_number(__get_grade_state(client.calculated_period.class_overall_average)),
         }
 
-        return json(gradeReturn)
+        return rjson(gradeReturn)
     else:
-        raise ServerError(success, status_code=498)
+        return rjson({"msg": success}, status=498)
 
 @app.route('/absences', methods=['GET'])
 async def absences(request):
@@ -877,7 +878,7 @@ async def absences(request):
     """
     
     token = request.args.get('token')
-    allPeriods = request.args.get('allPeriods', default=True, type=bool)
+    allPeriods = request.args.get('allPeriods', default=True)
 
     success, client = get_client(token)
     if success == 'ok':
@@ -899,9 +900,9 @@ async def absences(request):
 
             absencesData.append(absenceData)
 
-        return json(absencesData)
+        return rjson(absencesData)
     else:
-        raise ServerError(success, status_code=498)
+        return rjson({"msg": success}, status=498)
 
 
 @app.route('/delays', methods=['GET'])
@@ -918,7 +919,7 @@ async def delays(request):
     """
     
     token = request.args.get('token')
-    allPeriods = request.args.get('allPeriods', default=True, type=bool)
+    allPeriods = request.args.get('allPeriods', default=True)
 
     success, client = get_client(token)
     if success == 'ok':
@@ -940,9 +941,9 @@ async def delays(request):
 
             delaysData.append(delayData)
 
-        return json(delaysData)
+        return rjson(delaysData)
     else:
-        raise ServerError(success, status_code=498)
+        return rjson({"msg": success}, status=498)
 
 
 @app.route('/punishments', methods=['GET'])
@@ -959,7 +960,7 @@ async def punishments(request):
     """
     
     token = request.args.get('token')
-    allPeriods = request.args.get('allPeriods', default=True, type=bool)
+    allPeriods = request.args.get('allPeriods', default=True)
 
     success, client = get_client(token)
     if success == 'ok':
@@ -1022,9 +1023,9 @@ async def punishments(request):
 
             punishmentsData.append(punishmentData)
 
-        return json(punishmentsData)
+        return rjson(punishmentsData)
     else:
-        raise ServerError(success, status_code=498)
+        return rjson({"msg": success}, status=498)
 
 
 @app.route('/news', methods=['GET'])
@@ -1087,9 +1088,9 @@ async def news(request):
 
             newsAllData.append(newsData)
 
-        return json(newsAllData)
+        return rjson(newsAllData)
     else:
-        raise ServerError(success, status_code=498)
+        return rjson({"msg": success}, status=498)
 
 @app.route('/news/markAsRead', methods=['POST'])
 async def read_news(request):
@@ -1127,7 +1128,7 @@ async def read_news(request):
                         news.mark_as_read(not news.read)
                         current_state = not news.read
                             
-                        return json({
+                        return rjson({
                             "status": "ok",
                             "current_state": current_state,
                             "error": None
@@ -1225,9 +1226,9 @@ async def discussions(request):
 
             discussionsAllData.append(discussionData)
 
-        return json(discussionsAllData)
+        return rjson(discussionsAllData)
     else:
-        raise ServerError(success, status_code=498)
+        return rjson({"msg": success}, status=498)
 
 
 @app.route('/discussion/delete', methods=['POST'])
@@ -1263,7 +1264,7 @@ async def delete_discussion(request):
 
                 if local_id == discussionId:
                     discussion.delete()
-                    return json({
+                    return rjson({
                         "status": "ok",
                         "error": None
                     })
@@ -1314,7 +1315,7 @@ async def read_discussion(request):
                         discussion.mark_as(False)
                     else: 
                         discussion.mark_as(True)
-                    return json({
+                    return rjson({
                         "status": "ok",
                         "error": None
                     })
@@ -1327,9 +1328,9 @@ async def read_discussion(request):
             raise ServerError({
                 "status": "error",
                 "error": str(e)
-            }, status_code=500)
+            })
     else:
-        raise ServerError(success, status_code=498)
+        return rjson({"msg": success}, status=498)
 
 @app.route('/discussion/reply', methods=['POST'])
 async def reply_discussion(request):
@@ -1367,7 +1368,7 @@ async def reply_discussion(request):
                 if local_id == discussionId:
                     if discussion.replyable:
                         discussion.reply(content)
-                        return json({
+                        return rjson({
                             "status": "ok",
                             "error": None
                         })
@@ -1385,9 +1386,9 @@ async def reply_discussion(request):
             raise ServerError({
                 "status": "error",
                 "error": str(e)
-            }, status_code=500)
+            })
     else:
-        raise ServerError(success, status_code=498)
+        return rjson({"msg": success}, status=498)
 
 
 @app.route('/recipients', methods=['GET'])
@@ -1434,9 +1435,9 @@ async def recipients(request):
 
             recipientsAllData.append(recipientData)
         
-        return json(recipientsAllData)
+        return rjson(recipientsAllData)
     else:
-        raise ServerError(success, status_code=498)
+        return rjson({"msg": success}, status=498)
 
 
 @app.route('/discussion/create', methods=['POST'])
@@ -1482,7 +1483,7 @@ async def create_discussion(request):
                     })
                     
             client.new_discussion(subject, content, prn_recipients)
-            return json({
+            return rjson({
                 "status": "ok",
                 "error": None
             })
@@ -1490,9 +1491,9 @@ async def create_discussion(request):
             raise ServerError({
                 "status": "error",
                 "error": str(e)
-            }, status_code=500)
+            })
     else:
-        raise ServerError(success, status_code=498)
+        return rjson({"msg": success}, status=498)
 
 
 @app.route('/evaluations', methods=['GET'])
@@ -1572,9 +1573,9 @@ async def evaluations(request):
 
             evaluationsAllData.append(evaluationData)
 
-        return json(evaluationsAllData)
+        return rjson(evaluationsAllData)
     else:
-        raise ServerError(success, status_code=498)
+        return rjson({"msg": success}, status=498)
 
 def __get_meal_food(meal: list[dict]):
 	"""
@@ -1640,9 +1641,9 @@ async def export_ical(request):
     success, client = get_client(token)
     if success == 'ok':
         ical_url = client.export_ical()
-        return json({"ical_url": ical_url})
+        return rjson({"ical_url": ical_url})
     else:
-        raise ServerError(success, status_code=498)
+        return rjson({"msg": success}, status=498)
 
 @app.route('/menu', methods=['GET'])
 async def menu(request):
@@ -1716,9 +1717,9 @@ async def menu(request):
 
             menusAllData.append(menuData)
 
-        return json(menusAllData)
+        return rjson(menusAllData)
     else:
-        raise ServerError(success, status_code=498)
+        return rjson({"msg": success}, status=498)
     
 
 @app.route('/homework/changeState', methods=['POST'])
@@ -1781,17 +1782,17 @@ async def set_homework_as_done(request):
                             homework.set_done(True)
                             current_state = True
                         changed = True
-                        return json({
+                        return rjson({
                             "status": "ok",
                             "current_state": current_state,
                             "error": None
                         })
                 if not changed:
-                    raise ServerError("Aucun devoir trouvé avec cet ID local.", status_code=404)
+                    raise NotFound("Aucun devoir trouvé avec cet ID local.")
             except Exception as e:
-                raise ServerError(str(e), status_code=500)
+                raise ServerError(str(e))
     else:
-        raise ServerError(success, status_code=498)
+        return rjson({"msg": success}, status=498)
 
 
 if __name__ == '__main__':
