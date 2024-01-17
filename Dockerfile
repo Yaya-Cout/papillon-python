@@ -33,5 +33,5 @@ RUN mkdir -p /hosting/papillon && \
     chmod +x /hosting/papillon/start.sh
 
 CMD cd /hosting/papillon/ && \
-    pm2 start --name "Papillon" /hosting/papillon/start.sh --log /hosting/papillon/logs.txt && \
+    pm2 start --name "Papillon" /hosting/papillon/start.sh --cron-restart="$CRON" --log /hosting/papillon/logs.txt && \
     tail -f /hosting/papillon/logs.txt
