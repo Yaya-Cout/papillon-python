@@ -1792,3 +1792,7 @@ async def set_homework_as_done(request):
                 raise ServerError(str(e), status_code=500)
     else:
         raise ServerError(success, status_code=498)
+
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8000)
