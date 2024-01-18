@@ -1,15 +1,18 @@
 # importe les modules importants
 from pyexpat.errors import messages
 from os import environ
-import hug
 import pronotepy
 import datetime
 import time
 import secrets
-import falcon
 import json
 import socket
 import base64
+import pickle
+from sanic import Sanic
+from sanic.response import json as rjson
+from sanic.exceptions import ServerError, NotFound, BadRequest, Forbidden
+
 
 import sentry_sdk
 from sentry_sdk.scrubber import EventScrubber, DEFAULT_DENYLIST 
@@ -44,26 +47,23 @@ except Exception as e:
 	print("WARN: Couldn't init Sentry")
 	print(e)
 
-# ajouter les CORS sur toutes les routes
-@hug.response_middleware()
-def CORS(request, response, resource):
-	response.set_header('Access-Control-Allow-Origin', '*')
-	response.set_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-	response.set_header(
-		'Access-Control-Allow-Headers',
-		'Authorization,Keep-Alive,User-Agent,'
-		'If-Modified-Since,Cache-Control,Content-Type'
-	)
-	response.set_header(
-		'Access-Control-Expose-Headers',
-		'Authorization,Keep-Alive,User-Agent,'
-		'If-Modified-Since,Cache-Control,Content-Type'
-	)
+
+
+
+app = Sanic("PapillonRest")
+
+
+@app.middleware('response')
+async def CORS(request, response):
+	response.headers['Access-Control-Allow-Origin'] = '*'
+	response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+	response.headers['Access-Control-Allow-Headers'] = 'Authorization,Keep-Alive,User-Agent,If-Modified-Since,Cache-Control,Content-Type'
+	response.headers['Access-Control-Expose-Headers'] = 'Authorization,Keep-Alive,User-Agent,If-Modified-Since,Cache-Control,Content-Type'
 	if request.method == 'OPTIONS':
-		response.set_header('Access-Control-Max-Age', 1728000)
-		response.set_header('Content-Type', 'text/plain charset=UTF-8')
-		response.set_header('Content-Length', 0)
-		response.status_code = hug.HTTP_204
+		response.headers['Access-Control-Max-Age'] = 1728000
+		response.headers['Content-Type'] = 'text/plain charset=UTF-8'
+		response.headers['Content-Length'] = 0
+		response.status = 204
 
 # système de tokens
 saved_clients = {}
@@ -73,9 +73,11 @@ saved_clients ->
 		client -> instance de pronotepy.Client
 		last_interaction -> int (provenant de time.time(), entier représentant le temps depuis la dernière intéraction avec le client)
 """
+
+
 client_timeout_threshold = 300 # le temps en sec avant qu'un jeton ne soit rendu invalide
 
-def get_client(token: str) -> tuple[str, pronotepy.Client|None]:
+def get_client(token) -> tuple[str, pronotepy.Client|None]:
 	"""Retourne le client Pronote associé au jeton.
 
 	Args:
@@ -92,6 +94,7 @@ def get_client(token: str) -> tuple[str, pronotepy.Client|None]:
 		return 'maintenance', None
 	if token in saved_clients:
 		client_dict = saved_clients[token]
+		print("li", time.time() - client_dict['last_interaction'])
 		if time.time() - client_dict['last_interaction'] < client_timeout_threshold:
 			client_dict['last_interaction'] = time.time()
 			return 'ok', client_dict['client']
@@ -102,55 +105,81 @@ def get_client(token: str) -> tuple[str, pronotepy.Client|None]:
 	else:
 		return 'notfound', None
 
-@hug.get('/infos')
-def infos():
-	return {
-		'status': 'ok' if not MAINTENANCE['enable'] else 'maintenance',
-		'message': 'server is running' if not MAINTENANCE['enable'] else MAINTENANCE['message'],
+@app.get('/')
+async def home(request):
+	return rjson({
+		'status': 'ok',
+		'message': 'server is running',
 		'server': socket.gethostname(),
 		'version': API_VERSION,
 		'ent_list': CAS_LIST if not MAINTENANCE['enable'] else []
-	}
+	})
+
+@app.get('/infos')
+async def infos(request):
+	return rjson({
+		'status': 'ok',
+		'message': 'server is running',
+		'server': socket.gethostname(),
+		'version': API_VERSION,
+		'ent_list': CAS_LIST if not MAINTENANCE['enable'] else []
+	})
  
 # requête initiale :
 # un client doit faire
 # token = POST /generatetoken body={url, username, password, ent}
 # GET * token=token
-@hug.post('/generatetoken')
-def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode', 'token'])='url', type: hug.types.one_of(['eleve', 'parent'])='eleve', version: hug.types.one_of(['1', '2'])='1'):
-	if MAINTENANCE['enable']:
-		response.status = falcon.get_http_status(503)
-		return {
-			'token': False,
-			'error': 'Maintenance'
-		}
+@app.route('/generatetoken', methods=['POST'])
+async def generate_token(request):
+	print("Generating token...")
+	body = request.form
+
+	
 
 	if not body is None:
+		method = body.get('method', 'url')
+		type = body.get('type', 'eleve') 
+		version = body.get('version', '1')
+		print(body)
 		noENT = False
-
-		# version 2 uses base64
+		  
+		# if no version in URL
 		if version == '2':
 			try :
-				body['url'] = base64.b64decode(body['url']).decode('utf-8')
-				body['username'] = base64.b64decode(body['username']).decode('utf-8')
-				body['password'] = base64.b64decode(body['password']).decode('utf-8')
+				print("Decoding base64...")
+				body['url'] = base64.b64decode(body['url'][0]).decode('utf-8')
+				body['username'] = base64.b64decode(body['username'][0]).decode('utf-8')
+				body['password'] = base64.b64decode(body['password'][0]).decode('utf-8')
 				if 'ent' in body:
-					body['ent'] = base64.b64decode(body['ent']).decode('utf-8')
+					body['ent'] = base64.b64decode(body['ent'][0]).decode('utf-8')
 			except Exception as e:
-				response.status = falcon.get_http_status(400)
-				return {
+				print(e)
+				return rjson({
 					"token": False,
-					"error": f'Invalid base64'
-				}
+					"error": 'Invalid base64'
+				}, status=400)
+		else :
+			try :
+				body['url'] = body['url'][0]
+				body['username'] = body['username'][0]
+				body['password'] = body['password'][0]
+				if 'ent' in body:
+					body['ent'] = body['ent'][0]
+			except Exception as e:
+				print(e)
+				return rjson({
+					"token": False,
+					"error": 'Invalid plain text'
+				}, status=400)
 
 		if method == "url":
 			for rk in ('url', 'username', 'password', 'ent'):
 				if not rk in body and rk != 'ent':
-					response.status = falcon.get_http_status(400)
-					return {
+					return rjson({
 						"token": False,
 						"error": f'Missing {rk}'
-					}
+					}, status=400)
+				
 				elif not rk in body and rk == 'ent':
 					noENT = True 
 
@@ -166,31 +195,26 @@ def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode
 					else:
 						client = pronotepy.Client(body['url'], username=body['username'], password=body['password'], ent=getattr(pronotepy.ent, body['ent']))
 			except Exception as e:
-				response.status = falcon.get_http_status(498)
 				print(f"Error while trying to connect to {body['url']}")
 				print(e)
-
-				error = {
+				return rjson({
 					"token": False,
 					"error": str(e),
-				}
-				return error
+				}, status=498)
 
 		elif method == "qrcode":
 			for rk in ('url', 'qrToken', 'login', 'checkCode', 'uuid'):
 				if not rk in body:
-					response.status = falcon.get_http_status(400)
-					return {
+					return rjson({
 						"token": False,
 						"error": f'Missing {rk}'
-					}
+					},status=400)
 				elif rk == "checkCode":
 					if len(body["checkCode"]) != 4:
-						response.status = falcon.get_http_status(400)
-						return {
+						return rjson({
 							"token": False,
 							"error": f'checkCode must be 4 characters long (got {len(body["checkCode"])})'
-						}
+						},status=400)
 
 			try:
 				client = pronotepy.Client.qrcode_login({
@@ -199,23 +223,20 @@ def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode
 					"url": body['url']
 				}, body['checkCode'], body['uuid'])
 			except Exception as e:
-				response.status = falcon.get_http_status(498)
-				print(e)
-
-				error = {
+				print(e)                
+				return rjson({
 					"token": False,
 					"error": str(e),
-				}
-				return error
+				}, status=400)
 		
 		elif method == "token":
 			for rk in ('url', 'username', 'password', 'uuid'):
 				if not rk in body:
-					response.status = falcon.get_http_status(400)
-					return {
+					print("Missing", rk)
+					return rjson({
 						"token": False,
 						"error": f'Missing {rk}'
-					}
+					}, status=400)
 
 			try:
 				client = pronotepy.Client.token_login(
@@ -225,29 +246,31 @@ def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode
 					uuid=body['uuid']
 				)
 			except Exception as e:
-				response.status = falcon.get_http_status(498)
 				print(f"Error while trying to connect to {body['url']}")
 				print(e)
 
-				error = {
+				return rjson({
 					"token": False,
 					"error": str(e),
-				}
-				return error
+				}, status=498)
 
 		token = secrets.token_urlsafe(16)
-
+		print(token)
 		# Set current period
 		client.calculated_period = __get_current_period(client)
 		print(client.calculated_period)
 		client.activated_period = __get_current_period(client, False, None, True)
+
+		client_pickle = base64.b64encode(pickle.dumps(client)).decode()
 
 		saved_clients[token] = {
 			'client': client,
 			'last_interaction': time.time()
 		}
 
-		print(len(saved_clients), 'valid tokens')
+
+
+		#print(len(saved_clients), 'valid tokens')
 
 		# if error return error
 		if client.logged_in:
@@ -264,25 +287,20 @@ def generate_token(response, body=None, method: hug.types.one_of(['url', 'qrcode
 
 				return QRtokenArray
 
-			tokenArray = {
+			return rjson({
 				"token": token,
 				"error": False
-			}
-			return tokenArray
+			})
 		else:
-			response.status = falcon.get_http_status(498)
-			error = {
+			return rjson({
 				"token": False,
 				"error": "Login failed",
-			}
-			return error
+			}, status=498)
 	else:
-		response.status = falcon.get_http_status(400)
-		error = {
+		return rjson({
 			"token": False,
 			"error": "missingbody",
-		}
-		return error
+		}, 400)
 
 
 # TODO: METTRE A JOUR CETTE PARTIE SI DES PROBLEMES APPARAISSENT
@@ -344,48 +362,44 @@ def __get_current_period(client: pronotepy.Client, wantSpecificPeriod: bool = Fa
 			return __get_current_period(client, False, None)
 
 
-@hug.post('/changePeriod')
-def change_period(token: str, response, periodName: str):
+@app.route('/changePeriod', methods=['POST'])
+async def change_period(request):
 	"""
 	Permets de changer la période actuelle du client Pronote.
 	
 	Args:
 		token (str): Le token du client Pronote
-		response (falcon.Response): La réponse de la requête
 		periodName (str): Le nom de la période à sélectionner
 		
 	Returns:
 		dict[str, str]: Le statut de la requête et le nom de la période sélectionnée
 	"""
 	
+	token = request.json.get('token')
+	periodName = request.json.get('periodName')
+
 	success, client = get_client(token)
 	if success == 'ok':
 		if client.logged_in:
 			try:
 				client.calculated_period = __get_current_period(client, True, periodName)
-				return {
+				return rjson({
 					'status': 'ok',
 					'period': client.calculated_period.name
-				}
+				})
 			except Exception as e:
-				response.status = falcon.get_http_status(500)
-				return {
-					'status': 'error',
-					'message': str(e)
-				}
+				return rjson(success, status=498)
 	else:
-		response.status = falcon.get_http_status(498)
-		return success
+		return rjson(success, status=498)
 
 
-@hug.get('/user')
-def user(token: str, response):
+@app.route('/user', methods=['GET'])
+async def user(request):
 	"""
 	Récupère les informations de l'utilisateur.
 	
 	Args:
 		token (str): Le token du client Pronote
-		response (falcon.Response): La réponse de la requête
 		
 	Returns:
 		dict: Les informations de l'utilisateur sous la forme : 
@@ -404,6 +418,8 @@ def user(token: str, response):
 		}
 	"""
 	
+	token = request.args.get('token')
+
 	success, client = get_client(token)
 	if success == 'ok':
 		if client.logged_in:
@@ -473,21 +489,19 @@ def user(token: str, response):
 				}
 			}
 
-			return userData
+			return rjson(userData)
 	else:
-		response.status = falcon.get_http_status(498)
-		return success
+		return rjson(success, status=498)
 
 
-@hug.get('/timetable')
-def timetable(token: str, dateString: str, response):
+@app.route('/timetable', methods=['GET'])
+async def timetable(request):
 	"""
 	Récupère l'emploi du temps de l'utilisateur.
 	
 	Args:
 		token (str): Le token du client Pronote
 		dateString (str): La date à récupérer sous la forme YYYY-MM-DD
-		response (falcon.Response): La réponse de la requête
 		
 	Returns:
 		list[dict]: Les informations de l'emploi du temps :
@@ -514,6 +528,9 @@ def timetable(token: str, dateString: str, response):
 		}]
 	"""
 	
+	token = request.args.get('token')
+	dateString = request.args.get('dateString')
+
 	dateToGet = None
 
 	try :
@@ -521,6 +538,7 @@ def timetable(token: str, dateString: str, response):
 	except Exception as e:
 		dateToGet = datetime.datetime.now().date()
 	success, client = get_client(token)
+	print(token)
 
 	if success == 'ok':
 		if client.logged_in:
@@ -580,25 +598,26 @@ def timetable(token: str, dateString: str, response):
 				}
 				lessonsData.append(lessonData)
 
-			return lessonsData
+			return rjson(lessonsData)
 	else:
-		response.status = falcon.get_http_status(498)
-		return success
+		return rjson(success, status=498)
 
-@hug.get('/content')
-def content(token: str, dateString: str, response):
+@app.route('/content', methods=['GET'])
+async def content(request):
 	"""
 	Récupère le contenu des cours.
 	
 	Args:
 		token (str): Le token du client Pronote
 		dateString (str): La date à récupérer sous la forme YYYY-MM-DD
-		response (falcon.Response): La réponse de la requête
 		
 	Returns:
 		list[dict]: Les contenus du cours 
 	"""
 	
+	token = request.args.get('token')
+	dateString = request.args.get('dateString')
+
 	dateToGet = datetime.datetime.strptime(dateString, "%Y-%m-%d").date()
 	success, client = get_client(token)
 
@@ -628,13 +647,12 @@ def content(token: str, dateString: str, response):
 
 				contentData.append(contentList)
 
-			return contentData
+			return rjson(contentData)
 	else:
-		response.status = falcon.get_http_status(498)
-		return success
+		return rjson(success, status=498)
 
-@hug.get('/homework')
-def homework(token: str, dateFrom: str, dateTo: str, response):
+@app.route('/homework', methods=['GET'])
+async def homework(request):
 	"""
 	Récupère les devoirs de l'utilisateur.
 	
@@ -642,30 +660,15 @@ def homework(token: str, dateFrom: str, dateTo: str, response):
 		token (str): Le token du client Pronote
 		dateFrom (str): La date de début à récupérer sous la forme YYYY-MM-DD
 		dateTo (str): La date de fin à récupérer sous la forme YYYY-MM-DD
-		response (falcon.Response): La réponse de la requête
 		
 	Returns:
-		list[dict]: Les informations des devoirs :
-
-		{
-			"id": str,
-			"subject": {
-				"id": str,
-				"name": str,
-				"groups": bool
-			},
-			"description": str,
-			"background_color": str,
-			"date": str,
-			"files": list[dict {
-				"id": str,
-				"name": str,
-				"url": str,
-				"type": int
-			}]
-		}
+		list[dict]: Les informations des devoirs
 	"""
 	
+	token = request.args.get('token')
+	dateFrom = request.args.get('dateFrom')
+	dateTo = request.args.get('dateTo')
+
 	try :
 		dateFrom = datetime.datetime.strptime(dateFrom, "%Y-%m-%d").date()
 		dateTo = datetime.datetime.strptime(dateTo, "%Y-%m-%d").date()
@@ -716,13 +719,12 @@ def homework(token: str, dateFrom: str, dateTo: str, response):
 				}
 				homeworksData.append(homeworkData)
 
-			return homeworksData
+			return rjson(homeworksData)
 	else:
-		response.status = falcon.get_http_status(498)
-		return success
+		return rjson(success, status=498)
 
 
-def __get_grade_state(grade_value:str, significant:bool = False) -> int|str :
+def __get_grade_state(grade_value, significant:bool = False) -> int|str :
 	"""
 	Récupère l'état d'une note sous forme d'int. (Non Rendu, Absent, etc.)
 	
@@ -771,7 +773,7 @@ def __get_grade_state(grade_value:str, significant:bool = False) -> int|str :
 			return "-1"
 
 
-def __transform_to_number(value:str)->float|int:
+def __transform_to_number(value)->float|int:
 	"""
 	Transforme une valeur en nombre (int ou float)
 	
@@ -788,59 +790,20 @@ def __transform_to_number(value:str)->float|int:
 		return float(value.replace(",", "."))
 
 
-@hug.get('/grades')
-def grades(token: str, response):
+@app.route('/grades', methods=['GET'])
+async def grades(request):
 	"""
 	Récupère les notes de l'utilisateur.
 	
 	Args:
 		token (str): Le token du client Pronote
-		response (falcon.Response): La réponse de la requête
 		
 	Returns:
-		dict: Les informations des notes :
-		
-		{
-			grades : [{
-				"id": str,
-				"subject": {
-					"id": str,
-					"name": str,
-					"groups": bool
-				},
-				"date": str,
-				"description": str,
-				"is_bonus": bool,
-				"is_optional": bool,
-				"is_out_of_20": bool,
-				"grade": {
-					"value": int,
-					"out_of": int,
-					"coefficient": int,
-					"average": int,
-					"max": int,
-					"min": int,
-					"significant": int
-				},
-			}],
-			"average": [{
-				"subject": {
-					"id": str,
-					"name": str,
-					"groups": bool
-				},
-				"average": int,
-				"class_average": int,
-				"max": int,
-				"min": int,
-				"out_of": int,
-				"significant": int
-			}],
-			"overall_average": int,
-			"class_overall_average": int,
-		}
+		dict: Les informations des notes
 	"""
 	
+	token = request.args.get('token')
+
 	success, client = get_client(token)
 	if success == 'ok':
 		allGrades = []
@@ -903,35 +866,26 @@ def grades(token: str, response):
 			"class_overall_average": __transform_to_number(__get_grade_state(client.calculated_period.class_overall_average)),
 		}
 
-		return gradeReturn
+		return rjson(gradeReturn)
 	else:
-		response.status = falcon.get_http_status(498)
-		return success
+		return rjson(success, status=498)
 
-
-@hug.get('/absences')
-def absences(token: str, response, allPeriods: bool = True):
+@app.route('/absences', methods=['GET'])
+async def absences(request):
 	"""
 	Récupère les absences de l'utilisateur.
 	
 	Args:
 		token (str): Le token du client Pronote
-		response (falcon.Response): La réponse de la requête
 		allPeriods (bool): Si toutes les périodes doivent être récupérées. Par défaut, toutes les périodes sont récupérées.
 		
 	Returns:
-		list[dict]: Les informations des absences :
-		
-		[{
-			"id": str,
-			"from": str,
-			"to": str,
-			"justified": bool,
-			"hours": int,
-			"reasons": list[str],
-		}]
+		list[dict]: Les informations des absences
 	"""
 	
+	token = request.args.get('token')
+	allPeriods = request.args.get('allPeriods', default=True)
+
 	success, client = get_client(token)
 	if success == 'ok':
 		if allPeriods:
@@ -952,42 +906,34 @@ def absences(token: str, response, allPeriods: bool = True):
 
 			absencesData.append(absenceData)
 
-		return absencesData
+		return rjson(absencesData)
 	else:
-		response.status = falcon.get_http_status(498)
-		return success
+		return rjson(success, status=498)
 
 
-@hug.get('/delays')
-def delays(token: str, response, allPeriods: bool = True):
+@app.route('/delays', methods=['GET'])
+async def delays(request):
 	"""
 	Récupère les retards de l'utilisateur.
 	
 	Args:
 		token (str): Le token du client Pronote
-		response (falcon.Response): La réponse de la requête
 		allPeriods (bool): Si toutes les périodes doivent être récupérées. Par défaut, toutes les périodes sont récupérées.
 		
 	Returns:
-		list[dict]: Les informations des retards :
-		
-		[{
-			"id": str,
-			"date": str,
-			"duration": int,
-			"justified": bool,
-			"justification": str,
-			"reasons": list[str]
-		}]
+		list[dict]: Les informations des retards
 	"""
 	
+	token = request.args.get('token')
+	allPeriods = request.args.get('allPeriods', default=True)
+
 	success, client = get_client(token)
 	if success == 'ok':
 		if allPeriods:
 			allDelays = [delay for period in client.activated_period for delay in period.delays]
 		else:
 			allDelays = client.calculated_period.delays
-		
+
 		delaysData = []
 		for delay in allDelays:
 			delayData = {
@@ -1001,69 +947,34 @@ def delays(token: str, response, allPeriods: bool = True):
 
 			delaysData.append(delayData)
 
-		return delaysData
+		return rjson(delaysData)
 	else:
-		response.status = falcon.get_http_status(498)
-		return success
+		return rjson(success, status=498)
 
 
-@hug.get('/punishments')
-def punishments(token: str, response, allPeriods: bool = True):
+@app.route('/punishments', methods=['GET'])
+async def punishments(request):
 	"""
 	Récupère les punitions de l'utilisateur.
 	
 	Args:
 		token (str): Le token du client Pronote
-		response (falcon.Response): La réponse de la requête
 		allPeriods (bool): Si toutes les périodes doivent être récupérées. Par défaut, toutes les périodes sont récupérées.
 		
 	Returns:
-		list[dict]: Les informations des punitions :
-		
-		[{
-			"id": str,
-			"schedulable": bool,
-			"schedule": [
-				{
-					"id": str,
-					"start": str,
-					"duration": int,
-			],
-			"date": str,
-			"given_by": str,
-			"exclusion:" bool,
-			"during_lesson": bool,
-			"homework": {
-				"text": str,
-				"documents": [{
-					"id": str,
-					"name": str,
-					"url": str,
-					"type": int,
-				}],
-			},
-			"reasons": {
-				"text": str,
-				"circumstances": str,
-				"documents": [{
-					"id": str,
-					"name": str,
-					"url": str,
-					"type": int,
-				}],
-			},
-			"nature": str,
-			"duration": int,
-		}]
+		list[dict]: Les informations des punitions
 	"""
 	
+	token = request.args.get('token')
+	allPeriods = request.args.get('allPeriods', default=True)
+
 	success, client = get_client(token)
 	if success == 'ok':
 		if allPeriods:
 			allPunishments = [punishment for period in client.activated_period for punishment in period.punishments]
 		else:
 			allPunishments = client.calculated_period.punishments
-		
+
 		punishmentsData = []
 		for punishment in allPunishments:
 			homeworkDocs = []
@@ -1118,44 +1029,25 @@ def punishments(token: str, response, allPeriods: bool = True):
 
 			punishmentsData.append(punishmentData)
 
-		return punishmentsData
+		return rjson(punishmentsData)
 	else:
-		response.status = falcon.get_http_status(498)
-		return success
+		return rjson(success, status=498)
 
 
-@hug.get('/news')
-def news(token: str, response):
+@app.route('/news', methods=['GET'])
+async def news(request):
 	"""
 	Récupère les actualités de l'utilisateur.
 	
 	Args:
 		token (str): Le token du client Pronote
-		response (falcon.Response): La réponse de la requête
 		
 	Returns:
-		list[dict]: Les informations des actualités :
-		
-		[{
-			"id": str,
-			"title": str,
-			"date": str,
-			"category": str,
-			"read": bool,
-			"survey": bool,
-			"anonymous_survey": bool,
-			"author": str,
-			"content": str,
-			"attachments": [{
-				"id": str,
-				"name": str,
-				"url": str,
-				"type": int,
-			}],
-			"html_content": str,
-		}]
+		list[dict]: Les informations des actualités
 	"""
- 
+	
+	token = request.args.get('token')
+
 	success, client = get_client(token)
 	if success == 'ok':
 		allNews = []
@@ -1167,8 +1059,6 @@ def news(token: str, response):
 		newsAllData = []
 		for news in allNews:
 			local_id = ""
-
-			# return a combination of the 20 first letters of content, 2 first letters of title and the date
 
 			try :
 				local_id += news.title[:3]
@@ -1204,24 +1094,25 @@ def news(token: str, response):
 
 			newsAllData.append(newsData)
 
-		return newsAllData
+		return rjson(newsAllData)
 	else:
-		response.status = falcon.get_http_status(498)
-		return success
+		return rjson(success, status=498)
 
-@hug.post('/news/markAsRead')
-def read_news(token: str, newsId: str, response):
+@app.route('/news/markAsRead', methods=['POST'])
+async def read_news(request):
 	"""
 	Change l'état de lecture d'une actualité.
 
 	Args:
 		token (str): Le token du client Pronote
 		newsId (str): L'identifiant de l'actualité
-		response (falcon.Response): La réponse de la requête
 
 	Returns:
 
 	"""
+
+	token = request.json.get('token')
+	newsId = request.json.get('newsId')
 
 	success, client = get_client(token)
 	if success == 'ok':
@@ -1243,33 +1134,30 @@ def read_news(token: str, newsId: str, response):
 						news.mark_as_read(not news.read)
 						current_state = not news.read
 							
-						return {
+						return rjson({
 							"status": "ok",
 							"current_state": current_state,
 							"error": None
-						}
-					
-				response.status = falcon.get_http_status(404)
-				return {
+						})
+				
+				raise NotFound({
 					"status": "not found",
 					"error": "L'actualité n'a pas été trouvée."
-				}
+				})
 	
 			except Exception as e:
-				response.status = falcon.get_http_status(500)
-				return {
+				raise ServerError({
 					"status": "error",
 					"error": str(e)
-				}
+				})
 
-@hug.get('/discussions')
-def discussions(token: str, response):
+@app.route('/discussions', methods=['GET'])
+async def discussions(request):
 	"""
 	Récupère les discussions de l'utilisateur.
 	
 	Args:
 		token (str): Le token du client Pronote
-		response (falcon.Response): La réponse de la requête
 		
 	Returns:
 		list[dict]: Les informations des discussions :
@@ -1292,6 +1180,8 @@ def discussions(token: str, response):
 		}]
 	"""
 	
+	token = request.args.get('token')
+
 	success, client = get_client(token)
 	if success == 'ok':
 		allDiscussions = []
@@ -1342,26 +1232,27 @@ def discussions(token: str, response):
 
 			discussionsAllData.append(discussionData)
 
-		return discussionsAllData
+		return rjson(discussionsAllData)
 	else:
-		response.status = falcon.get_http_status(498)
-		return success
+		return rjson(success, status=498)
 
 
-@hug.post('/discussion/delete')
-def delete_discussion(token: str, discussionId: str, response):
+@app.route('/discussion/delete', methods=['POST'])
+async def delete_discussion(request):
 	"""
 	Supprime une discussion.
 	
 	Args:
 		token (str): Le token du client Pronote
 		discussionId (str): L'identifiant de la discussion
-		response (falcon.Response): La réponse de la requête
 		
 	Returns:
 		str: 'ok' si la discussion a été supprimée, 'not found' si la discussion n'a pas été trouvée, 'error' si une erreur est survenue.
 	"""
 	
+	token = request.json.get('token')
+	discussionId = request.json.get('discussionId')
+
 	success, client = get_client(token)
 	if success == 'ok':
 		try:
@@ -1379,40 +1270,37 @@ def delete_discussion(token: str, discussionId: str, response):
 
 				if local_id == discussionId:
 					discussion.delete()
-					return {
+					return rjson({
 						"status": "ok",
 						"error": None
-					}
-				else:
-					response.status = falcon.get_http_status(404)
-					return {
-						"status": "not found",
-						"error": "La discussion n'a pas été trouvée."
-					}
+					})
+			
+			raise NotFound({
+				"status": "not found",
+				"error": "La discussion n'a pas été trouvée."
+			})
 		except Exception as e:
-			response.status = falcon.get_http_status(500)
-			return {
+			raise ServerError({
 				"status": "error",
 				"error": str(e)
-			}
-	else:
-		response.status = falcon.get_http_status(498)
-		return success
+			})
 
-@hug.post('/discussion/readState')
-def read_discussion(token: str, discussionId: str, response):
+@app.route('/discussion/readState', methods=['POST'])
+async def read_discussion(request):
 	"""
 	Change l'état de lecture d'une discussion.
 	
 	Args:
 		token (str): Le token du client Pronote
 		discussionId (str): L'identifiant de la discussion
-		response (falcon.Response): La réponse de la requête
 		
 	Returns:
 		str: 'ok' si l'état de lecture a été changé, 'not found' si la discussion n'a pas été trouvée, 'error' si une erreur est survenue.
 	"""
 	
+	token = request.json.get('token')
+	discussionId = request.json.get('discussionId')
+
 	success, client = get_client(token)
 	if success == 'ok':
 		try:
@@ -1429,30 +1317,29 @@ def read_discussion(token: str, discussionId: str, response):
 					local_id += discussion.date.strftime("%Y-%m-%d_%H:%M")
 
 				if local_id == discussionId:
-					if discussion.unread == 0: discussion.mark_as(False)
-					else: discussion.mark_as(True)
-					return {
+					if discussion.unread == 0: 
+						discussion.mark_as(False)
+					else: 
+						discussion.mark_as(True)
+					return rjson({
 						"status": "ok",
 						"error": None
-					}
-				else:
-					response.status = falcon.get_http_status(404)
-					return {
-						"status": "not found",
-						"error": "La discussion n'a pas été trouvée."
-					}
+					})
+			
+			raise NotFound({
+				"status": "not found",
+				"error": "La discussion n'a pas été trouvée."
+			})
 		except Exception as e:
-			response.status = falcon.get_http_status(500)
-			return {
+			raise ServerError({
 				"status": "error",
 				"error": str(e)
-			}
+			})
 	else:
-		response.status = falcon.get_http_status(498)
-		return success
+		return rjson(success, status=498)
 
-@hug.post('/discussion/reply')
-def reply_discussion(token: str, discussionId: str, content: str, response):
+@app.route('/discussion/reply', methods=['POST'])
+async def reply_discussion(request):
 	"""
 	Répond à une discussion.
 	
@@ -1460,12 +1347,15 @@ def reply_discussion(token: str, discussionId: str, content: str, response):
 		token (str): Le token du client Pronote
 		discussionId (str): L'identifiant de la discussion
 		content (str): Le contenu du message
-		response (falcon.Response): La réponse de la requête
 		
 	Returns:
 		str: 'ok' si le message a été envoyé, 'not replyable' si la discussion n'est pas ouverte à la réponse, 'not found' si la discussion n'a pas été trouvée, 'error' si une erreur est survenue.
 	"""
 	
+	token = request.json.get('token')
+	discussionId = request.json.get('discussionId')
+	content = request.json.get('content')
+
 	success, client = get_client(token)
 	if success == 'ok':
 		try:
@@ -1484,41 +1374,36 @@ def reply_discussion(token: str, discussionId: str, content: str, response):
 				if local_id == discussionId:
 					if discussion.replyable:
 						discussion.reply(content)
-						return {
+						return rjson({
 							"status": "ok",
 							"error": None
-						}
+						})
 					else:
-						response.status = falcon.get_http_status(403)
-						return {
+						raise Forbidden({
 							"status": "not replyable",
 							"error": "La discussion n'est pas ouverte à la réponse."
-						}
-				else:
-					response.status = falcon.get_http_status(404)
-					return {
-						"status": "not found",
-						"error": "La discussion n'a pas été trouvée."
-					}
+						})
+			
+			raise NotFound({
+				"status": "not found",
+				"error": "La discussion n'a pas été trouvée."
+			})
 		except Exception as e:
-			response.status = falcon.get_http_status(500)
-			return {
+			raise ServerError({
 				"status": "error",
 				"error": str(e)
-			}
+			})
 	else:
-		response.status = falcon.get_http_status(498)
-		return success
+		return rjson(success, status=498)
 
 
-@hug.get('/recipients')
-def recipients(token: str, response):
+@app.route('/recipients', methods=['GET'])
+async def recipients(request):
 	"""
 	Récupère la liste des destinataires possibles.
 	
 	Args:
 		token (str): Le token du client Pronote
-		response (falcon.Response): La réponse de la requête
 		
 	Returns:
 		list: La liste des destinataires possibles.
@@ -1533,6 +1418,8 @@ def recipients(token: str, response):
 		}]
 	"""
 	
+	token = request.args.get('token')
+
 	success, client = get_client(token)
 	if success == 'ok':
 		allRecipients = []
@@ -1554,14 +1441,13 @@ def recipients(token: str, response):
 
 			recipientsAllData.append(recipientData)
 		
-		return recipientsAllData
+		return rjson(recipientsAllData)
 	else:
-		response.status = falcon.get_http_status(498)
-		return success
+		return rjson(success, status=498)
 
 
-@hug.post('/discussion/create')
-def create_discussion(token: str, subject: str, content: str, recipientsId: str, response):
+@app.route('/discussion/create', methods=['POST'])
+async def create_discussion(request):
 	"""
 	Créer une discussion.
 	
@@ -1570,60 +1456,59 @@ def create_discussion(token: str, subject: str, content: str, recipientsId: str,
 		subject (str): Le sujet de la discussion
 		content (str): Le contenu du message
 		recipientsId (str): La liste des identifiants des destinataires ([id1, id2, id3])
-		response (falcon.Response): La réponse de la requête
 		
 	Returns:
 		str: 'ok' si la discussion a été créée, 'error' si une erreur est survenue.
 	"""
 	
+	token = request.json.get('token')
+	subject = request.json.get('subject')
+	content = request.json.get('content')
+	recipientsId = request.json.get('recipientsId')
+
 	success, client = get_client(token)
 	if success == 'ok':
 		try:
 			prn_recipients = []
-			for recipient in json.loads(recipientsId):
+			for recipient in json_module.loads(recipientsId):
 				for prn_recipient in client.get_recipients():
 					if prn_recipient.id == recipient:
 						prn_recipients.append(prn_recipient)
 						
 			if len(prn_recipients) == 0:
-				response.status = falcon.get_http_status(400)
-				return {
+				raise BadRequest({
 					"status": "no recipient",
 					"error": "Aucun destinataire valide n'a été trouvé."
-				}
+				})
 				
 			for prn_recipient in prn_recipients:
 				if prn_recipient.with_discussion == False:
-					response.status = falcon.get_http_status(400)
-					return {
+					raise BadRequest({
 						"status": "recipient not accept discussion",
 						"error": "Un ou plusieurs destinataires n'acceptent pas les discussions."
-					}
+					})
 					
 			client.new_discussion(subject, content, prn_recipients)
-			return {
+			return rjson({
 				"status": "ok",
 				"error": None
-			}
+			})
 		except Exception as e:            
-			response.status = falcon.get_http_status(500)
-			return {
+			raise ServerError({
 				"status": "error",
 				"error": str(e)
-			}
+			})
 	else:
-		response.status = falcon.get_http_status(498)
-		return success
+		return rjson(success, status=498)
 
 
-@hug.get('/evaluations')
-def evaluations(token: str, response):
+@app.route('/evaluations', methods=['GET'])
+async def evaluations(request):
 	"""
 	Permet de récupérer les évaluations.
 	
 	Args:
 		token (str): Le token du client Pronote
-		response (falcon.Response): La réponse de la requête
 		
 	Returns:
 		list[dict]: La liste des évaluations.
@@ -1652,6 +1537,8 @@ def evaluations(token: str, response):
 		}]
 	"""
 	
+	token = request.args.get('token')
+
 	success, client = get_client(token)
 	if success == 'ok':
 		allEvaluations = []
@@ -1692,10 +1579,9 @@ def evaluations(token: str, response):
 
 			evaluationsAllData.append(evaluationData)
 
-		return evaluationsAllData
+		return rjson(evaluationsAllData)
 	else:
-		response.status = falcon.get_http_status(498)
-		return success
+		return rjson(success, status=498)
 
 def __get_meal_food(meal: list[dict]):
 	"""
@@ -1742,8 +1628,31 @@ def __get_food_labels(labels: list[dict]):
 			})
 		return foodLabels
 
-@hug.get('/menu')
-def menu(token: str, dateFrom: str, dateTo: str, response):
+
+
+@app.route('/export/ical', methods=['GET'])
+async def export_ical(request):
+	"""
+	Permet d'exporter les données de Pronote en iCal. (si l'instance de Pronote le permet)
+	
+	Args:
+		token (str): Le token du client Pronote
+		
+	Returns:
+		str: L'URL de l'iCal.
+	"""
+	
+	token = request.args.get('token')
+
+	success, client = get_client(token)
+	if success == 'ok':
+		ical_url = client.export_ical()
+		return rjson({"ical_url": ical_url})
+	else:
+		return rjson(success, status=498)
+
+@app.route('/menu', methods=['GET'])
+async def menu(request):
 	"""
 	Permet de récupérer les menus.
 	
@@ -1751,7 +1660,6 @@ def menu(token: str, dateFrom: str, dateTo: str, response):
 		token (str): Le token du client Pronote
 		dateFrom (str): La date de début
 		dateTo (str): La date de fin
-		response (falcon.Response): La réponse de la requête
 		
 	Returns:
 		list[dict]: La liste des menus.
@@ -1773,12 +1681,17 @@ def menu(token: str, dateFrom: str, dateTo: str, response):
 		}]
 	"""
 	
+	token = request.args.get('token')
+	dateFrom = request.args.get('dateFrom')
+	dateTo = request.args.get('dateTo')
+
 	try :
 		dateFrom = datetime.datetime.strptime(dateFrom, "%Y-%m-%d").date()
 		dateTo = datetime.datetime.strptime(dateTo, "%Y-%m-%d").date()
 	except Exception as e:
 		dateFrom = datetime.datetime.now().date()
 		dateTo = datetime.datetime.now().date()
+
 	success, client = get_client(token)
 	if success == 'ok':
 		allMenus = client.menus(date_from=dateFrom, date_to=dateTo)
@@ -1810,35 +1723,13 @@ def menu(token: str, dateFrom: str, dateTo: str, response):
 
 			menusAllData.append(menuData)
 
-		return menusAllData
+		return rjson(menusAllData)
 	else:
-		response.status = falcon.get_http_status(498)
-		return success
-
-@hug.get('/export/ical')
-def export_ical(token: str, response):
-	"""
-	Permet d'exporter les données de Pronote en iCal. (si l'instance de Pronote le permet)
+		return rjson(success, status=498)
 	
-	Args:
-		token (str): Le token du client Pronote
-		response (falcon.Response): La réponse de la requête
-		
-	Returns:
-		str: L'URL de l'iCal.
-	"""
-	
-	success, client = get_client(token)
-	if success == 'ok':
-		ical_url = client.export_ical()
-		return ical_url
-	else:
-		response.status = falcon.get_http_status(498)
-		return success
 
-
-@hug.post('/homework/changeState')
-def set_homework_as_done(token: str, dateFrom: str, dateTo: str, homeworkId: str, response):
+@app.route('/homework/changeState', methods=['POST'])
+async def set_homework_as_done(request):
 	"""
 	Change l'état d'un devoir. (fait ou non fait)
 	
@@ -1847,18 +1738,23 @@ def set_homework_as_done(token: str, dateFrom: str, dateTo: str, homeworkId: str
 		dateFrom (str): La date de début
 		dateTo (str): La date de fin
 		homeworkId (str): Le LocaID du devoir
-		response (falcon.Response): La réponse de la requête
 		
 	Returns:
 		str: 'ok' si tout s'est bien passé, 'not found' si le devoir n'a pas été trouvé, 'error' si une erreur est survenue.
 	"""
 	
+	token = request.json.get('token')
+	dateFrom = request.json.get('dateFrom')
+	dateTo = request.json.get('dateTo')
+	homeworkId = request.json.get('homeworkId')
+
 	try :
 		dateFrom = datetime.datetime.strptime(dateFrom, "%Y-%m-%d").date()
 		dateTo = datetime.datetime.strptime(dateTo, "%Y-%m-%d").date()
 	except Exception as e:
 		dateFrom = datetime.datetime.now().date()
 		dateTo = datetime.datetime.now().date()
+
 	success, client = get_client(token)
 
 	if success == 'ok':
@@ -1892,23 +1788,20 @@ def set_homework_as_done(token: str, dateFrom: str, dateTo: str, homeworkId: str
 							homework.set_done(True)
 							current_state = True
 						changed = True
-						return {
+						return rjson({
 							"status": "ok",
 							"current_state": current_state,
 							"error": None
-						}
+						})
 				if not changed:
-					response.status = falcon.get_http_status(404)
-					return {
-						"status": "not found",
-						"error": "Aucun devoir trouvé avec cet ID local."
-					}
+					raise NotFound("Aucun devoir trouvé avec cet ID local.")
 			except Exception as e:
-				response.status = falcon.get_http_status(500)
-				return {
-					"status": "error",
-					"error": str(e)
-				}
+				raise ServerError(str(e))
 	else:
-		response.status = falcon.get_http_status(498)
-		return success
+		return rjson(success, status=498)
+
+def main():
+	app.run(host="0.0.0.0", port=8000)
+
+if __name__ == '__main__':
+	main()
