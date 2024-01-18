@@ -63,7 +63,9 @@ async def CORS(request, response):
 		response.status = 204
 
 # système de tokens
-saved_clients = {}
+@app.before_server_start
+async def attach_saved_clients(app, loop):
+    app.ctx.saved_clients = {}
 
 """
 saved_clients ->
@@ -90,15 +92,15 @@ def get_client(token) -> tuple[str, pronotepy.Client|None]:
 	"""
 	if MAINTENANCE['enable']:
 		return 'maintenance', None
-	if token in saved_clients:
-		client_dict = saved_clients[token]
+	if token in app.ctx.saved_clients:
+		client_dict = app.ctx.saved_clients[token]
 		print("li", time.time() - client_dict['last_interaction'])
 		if time.time() - client_dict['last_interaction'] < client_timeout_threshold:
 			client_dict['last_interaction'] = time.time()
 			return 'ok', client_dict['client']
 		else:
-			del saved_clients[token]
-			print(len(saved_clients), 'valid tokens')
+			del app.ctx.saved_clients[token]
+			print(len(app.ctx.saved_clients), 'valid tokens')
 			return 'expired', None
 	else:
 		return 'notfound', None
@@ -261,14 +263,14 @@ async def generate_token(request):
 
 		client_pickle = base64.b64encode(pickle.dumps(client)).decode()
 
-		saved_clients[token] = {
+		app.ctx.saved_clients[token] = {
 			'client': client,
 			'last_interaction': time.time()
 		}
 
 
 
-		#print(len(saved_clients), 'valid tokens')
+		#print(len(app.ctx.saved_clients), 'valid tokens')
 
 		# if error return error
 		if client.logged_in:
@@ -386,9 +388,9 @@ async def change_period(request):
 					'period': client.calculated_period.name
 				})
 			except Exception as e:
-				return text('"'+success+'"', status=498)
+				return text(success, status=498)
 	else:
-		return text('"'+success+'"', status=498)
+		return text(success, status=498)
 
 
 @app.route('/user', methods=['GET'])
@@ -489,7 +491,7 @@ async def user(request):
 
 			return rjson(userData)
 	else:
-		return text('"'+success+'"', status=498)
+		return text(success, status=498)
 
 
 @app.route('/timetable', methods=['GET'])
@@ -598,7 +600,7 @@ async def timetable(request):
 
 			return rjson(lessonsData)
 	else:
-		return text('"'+success+'"', status=498)
+		return text(success, status=498)
 
 @app.route('/content', methods=['GET'])
 async def content(request):
@@ -647,7 +649,7 @@ async def content(request):
 
 			return rjson(contentData)
 	else:
-		return text('"'+success+'"', status=498)
+		return text(success, status=498)
 
 @app.route('/homework', methods=['GET'])
 async def homework(request):
@@ -719,7 +721,7 @@ async def homework(request):
 
 			return rjson(homeworksData)
 	else:
-		return text('"'+success+'"', status=498)
+		return text(success, status=498)
 
 
 def __get_grade_state(grade_value, significant:bool = False) -> int|str :
@@ -866,7 +868,7 @@ async def grades(request):
 
 		return rjson(gradeReturn)
 	else:
-		return text('"'+success+'"', status=498)
+		return text(success, status=498)
 
 @app.route('/absences', methods=['GET'])
 async def absences(request):
@@ -906,7 +908,7 @@ async def absences(request):
 
 		return rjson(absencesData)
 	else:
-		return text('"'+success+'"', status=498)
+		return text(success, status=498)
 
 
 @app.route('/delays', methods=['GET'])
@@ -947,7 +949,7 @@ async def delays(request):
 
 		return rjson(delaysData)
 	else:
-		return text('"'+success+'"', status=498)
+		return text(success, status=498)
 
 
 @app.route('/punishments', methods=['GET'])
@@ -1029,7 +1031,7 @@ async def punishments(request):
 
 		return rjson(punishmentsData)
 	else:
-		return text('"'+success+'"', status=498)
+		return text(success, status=498)
 
 
 @app.route('/news', methods=['GET'])
@@ -1094,7 +1096,7 @@ async def news(request):
 
 		return rjson(newsAllData)
 	else:
-		return text('"'+success+'"', status=498)
+		return text(success, status=498)
 
 @app.route('/news/markAsRead', methods=['POST'])
 async def read_news(request):
@@ -1232,7 +1234,7 @@ async def discussions(request):
 
 		return rjson(discussionsAllData)
 	else:
-		return text('"'+success+'"', status=498)
+		return text(success, status=498)
 
 
 @app.route('/discussion/delete', methods=['POST'])
@@ -1334,7 +1336,7 @@ async def read_discussion(request):
 				"error": str(e)
 			})
 	else:
-		return text('"'+success+'"', status=498)
+		return text(success, status=498)
 
 @app.route('/discussion/reply', methods=['POST'])
 async def reply_discussion(request):
@@ -1392,7 +1394,7 @@ async def reply_discussion(request):
 				"error": str(e)
 			})
 	else:
-		return text('"'+success+'"', status=498)
+		return text(success, status=498)
 
 
 @app.route('/recipients', methods=['GET'])
@@ -1441,7 +1443,7 @@ async def recipients(request):
 		
 		return rjson(recipientsAllData)
 	else:
-		return text('"'+success+'"', status=498)
+		return text(success, status=498)
 
 
 @app.route('/discussion/create', methods=['POST'])
@@ -1497,7 +1499,7 @@ async def create_discussion(request):
 				"error": str(e)
 			})
 	else:
-		return text('"'+success+'"', status=498)
+		return text(success, status=498)
 
 
 @app.route('/evaluations', methods=['GET'])
@@ -1579,7 +1581,7 @@ async def evaluations(request):
 
 		return rjson(evaluationsAllData)
 	else:
-		return text('"'+success+'"', status=498)
+		return text(success, status=498)
 
 def __get_meal_food(meal: list[dict]):
 	"""
@@ -1647,7 +1649,7 @@ async def export_ical(request):
 		ical_url = client.export_ical()
 		return rjson({"ical_url": ical_url})
 	else:
-		return text('"'+success+'"', status=498)
+		return text(success, status=498)
 
 @app.route('/menu', methods=['GET'])
 async def menu(request):
@@ -1723,7 +1725,7 @@ async def menu(request):
 
 		return rjson(menusAllData)
 	else:
-		return text('"'+success+'"', status=498)
+		return text(success, status=498)
 	
 
 @app.route('/homework/changeState', methods=['POST'])
@@ -1796,7 +1798,7 @@ async def set_homework_as_done(request):
 			except Exception as e:
 				raise ServerError(str(e))
 	else:
-		return text('"'+success+'"', status=498)
+		return text(success, status=498)
 
 def main():
 	app.run(host="0.0.0.0", port=8000, fast=True)
