@@ -1803,7 +1803,7 @@ async def set_homework_as_done(request):
 		return text('"'+success+'"', status=498)
 
 def main():
-	app.run(host="0.0.0.0", port=8000, fast=True)
+	app.run(host="0.0.0.0", port=8000, single_process=True)
 
 if __name__ == '__main__':
 	main()
