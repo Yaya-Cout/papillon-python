@@ -90,6 +90,8 @@ def get_client(token) -> tuple[str, pronotepy.Client|None]:
 			pronotepy.Client|None: une instance de client si le token est valide, None sinon.
 
 	"""
+	print(len(app.ctx.saved_clients), 'valid tokens')
+
 	if MAINTENANCE['enable']:
 		return 'maintenance', None
 	if token in app.ctx.saved_clients:
@@ -99,7 +101,6 @@ def get_client(token) -> tuple[str, pronotepy.Client|None]:
 			return 'ok', client_dict['client']
 		else:
 			del app.ctx.saved_clients[token]
-			print(len(app.ctx.saved_clients), 'valid tokens')
 			return 'expired', None
 	else:
 		return 'notfound', None
@@ -190,7 +191,6 @@ async def generate_token(request):
 						client = pronotepy.Client(body['url'], username=body['username'], password=body['password'], ent=getattr(pronotepy.ent, body['ent']))
 			except Exception as e:
 				print(f"Error while trying to connect to {body['url']}")
-				print(e)
 				return rjson({
 					"token": False,
 					"error": str(e),
