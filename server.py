@@ -8,13 +8,11 @@ import secrets
 import json
 import socket
 import base64
-import redis
 import pickle
 from sanic import Sanic
 from sanic.response import json as rjson
 from sanic.exceptions import ServerError, NotFound, BadRequest, Forbidden
 
-from redis.commands.json.path import Path
 
 import sentry_sdk
 from sentry_sdk.scrubber import EventScrubber, DEFAULT_DENYLIST 
@@ -50,12 +48,7 @@ except Exception as e:
 	print(e)
 
 
-try:
-	r = redis.Redis(host='localhost', port=6379, decode_responses=True)
-except Exception as e:
-	raise Exception("Couldn't connect to Redis"
-				"\nPlease make sure that Redis is running on port 6379")
-	
+
 
 app = Sanic("PapillonRest")
 
@@ -84,7 +77,7 @@ saved_clients ->
 
 client_timeout_threshold = 300 # le temps en sec avant qu'un jeton ne soit rendu invalide
 
-def get_client(token: str) -> tuple[str, pronotepy.Client|None]:
+def get_client(token) -> tuple[str, pronotepy.Client|None]:
 	"""Retourne le client Pronote associé au jeton.
 
 	Args:
@@ -261,8 +254,7 @@ async def generate_token(request):
 			'last_interaction': time.time()
 		}
 
-		r.set(f"{token}:client", client_pickle)
-		r.set(f"{token}:last_interaction", time.time())
+
 
 		#print(len(saved_clients), 'valid tokens')
 
@@ -718,7 +710,7 @@ async def homework(request):
         return rjson({"msg": success}, status=498)
 
 
-def __get_grade_state(grade_value:str, significant:bool = False) -> int|str :
+def __get_grade_state(grade_value, significant:bool = False) -> int|str :
 	"""
 	Récupère l'état d'une note sous forme d'int. (Non Rendu, Absent, etc.)
 	
@@ -767,7 +759,7 @@ def __get_grade_state(grade_value:str, significant:bool = False) -> int|str :
 			return "-1"
 
 
-def __transform_to_number(value:str)->float|int:
+def __transform_to_number(value)->float|int:
 	"""
 	Transforme une valeur en nombre (int ou float)
 	
@@ -1794,6 +1786,8 @@ async def set_homework_as_done(request):
     else:
         return rjson({"msg": success}, status=498)
 
+def main():
+    app.run(host='0.0.0.0', port=8000)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000)
+    main()
