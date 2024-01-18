@@ -1801,7 +1801,7 @@ async def set_homework_as_done(request):
 		return rjson(success, status=498)
 
 def main():
-	app.run(host="0.0.0.0", port=8000)
+	app.run(host="0.0.0.0", port=8000, fast=True)
 
 if __name__ == '__main__':
 	main()
