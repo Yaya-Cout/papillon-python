@@ -1,4 +1,4 @@
-FROM sanicframework/sanic:lts-py3.11
+FROM sanicframework/sanic:3.11-latest
 # Set environment variable
 ENV CRON "*/25 * * * *"
 ENV DSN_URL "http://server:port"
