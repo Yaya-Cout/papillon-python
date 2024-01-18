@@ -12,6 +12,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
@@ -28,6 +31,7 @@ jobs:
           docker buildx build \
             --file Dockerfile \
             --tag justtryon/papillonserver:latest \
+            --platform linux/amd64,linux/aarch64 \
             .
       
       - name: Push Docker image to Docker Hub
@@ -36,4 +40,5 @@ jobs:
           docker buildx build \
             --file Dockerfile \
             --tag justtryon/papillonserver:latest \
+            --platform linux/amd64,linux/aarch64 \
             --push .

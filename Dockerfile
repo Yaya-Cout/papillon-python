@@ -12,4 +12,4 @@ RUN pip install lxml sentry-sdk redis sanic
 
 EXPOSE 8000
 
-CMD ["python", "server.py"]
+CMD ["sanic", "server"]
