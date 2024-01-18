@@ -389,9 +389,9 @@ async def change_period(request):
 					'period': client.calculated_period.name
 				})
 			except Exception as e:
-				return text('"'+success+'"')
+				return text('"'+success+'"', status=498)
 	else:
-		return text('"'+success+'"')
+		return text('"'+success+'"', status=498)
 
 
 @app.route('/user', methods=['GET'])
