@@ -11,6 +11,7 @@ import base64
 import pickle
 from sanic import Sanic
 from sanic.response import json as rjson
+from sanic.response import text
 from sanic.exceptions import ServerError, NotFound, BadRequest, Forbidden
 
 
@@ -388,9 +389,9 @@ async def change_period(request):
 					'period': client.calculated_period.name
 				})
 			except Exception as e:
-				return rjson(success, status=498)
+				return text('"'+success+'"')
 	else:
-		return rjson(success, status=498)
+		return text('"'+success+'"')
 
 
 @app.route('/user', methods=['GET'])
@@ -491,7 +492,7 @@ async def user(request):
 
 			return rjson(userData)
 	else:
-		return rjson(success, status=498)
+		return text('"'+success+'"')
 
 
 @app.route('/timetable', methods=['GET'])
@@ -600,7 +601,7 @@ async def timetable(request):
 
 			return rjson(lessonsData)
 	else:
-		return rjson(success, status=498)
+		return text('"'+success+'"')
 
 @app.route('/content', methods=['GET'])
 async def content(request):
@@ -649,7 +650,7 @@ async def content(request):
 
 			return rjson(contentData)
 	else:
-		return rjson(success, status=498)
+		return text('"'+success+'"')
 
 @app.route('/homework', methods=['GET'])
 async def homework(request):
@@ -721,7 +722,7 @@ async def homework(request):
 
 			return rjson(homeworksData)
 	else:
-		return rjson(success, status=498)
+		return text('"'+success+'"')
 
 
 def __get_grade_state(grade_value, significant:bool = False) -> int|str :
@@ -868,7 +869,7 @@ async def grades(request):
 
 		return rjson(gradeReturn)
 	else:
-		return rjson(success, status=498)
+		return text('"'+success+'"')
 
 @app.route('/absences', methods=['GET'])
 async def absences(request):
@@ -908,7 +909,7 @@ async def absences(request):
 
 		return rjson(absencesData)
 	else:
-		return rjson(success, status=498)
+		return text('"'+success+'"')
 
 
 @app.route('/delays', methods=['GET'])
@@ -949,7 +950,7 @@ async def delays(request):
 
 		return rjson(delaysData)
 	else:
-		return rjson(success, status=498)
+		return text('"'+success+'"')
 
 
 @app.route('/punishments', methods=['GET'])
@@ -1031,7 +1032,7 @@ async def punishments(request):
 
 		return rjson(punishmentsData)
 	else:
-		return rjson(success, status=498)
+		return text('"'+success+'"')
 
 
 @app.route('/news', methods=['GET'])
@@ -1096,7 +1097,7 @@ async def news(request):
 
 		return rjson(newsAllData)
 	else:
-		return rjson(success, status=498)
+		return text('"'+success+'"')
 
 @app.route('/news/markAsRead', methods=['POST'])
 async def read_news(request):
@@ -1234,7 +1235,7 @@ async def discussions(request):
 
 		return rjson(discussionsAllData)
 	else:
-		return rjson(success, status=498)
+		return text('"'+success+'"')
 
 
 @app.route('/discussion/delete', methods=['POST'])
@@ -1336,7 +1337,7 @@ async def read_discussion(request):
 				"error": str(e)
 			})
 	else:
-		return rjson(success, status=498)
+		return text('"'+success+'"')
 
 @app.route('/discussion/reply', methods=['POST'])
 async def reply_discussion(request):
@@ -1394,7 +1395,7 @@ async def reply_discussion(request):
 				"error": str(e)
 			})
 	else:
-		return rjson(success, status=498)
+		return text('"'+success+'"')
 
 
 @app.route('/recipients', methods=['GET'])
@@ -1443,7 +1444,7 @@ async def recipients(request):
 		
 		return rjson(recipientsAllData)
 	else:
-		return rjson(success, status=498)
+		return text('"'+success+'"')
 
 
 @app.route('/discussion/create', methods=['POST'])
@@ -1499,7 +1500,7 @@ async def create_discussion(request):
 				"error": str(e)
 			})
 	else:
-		return rjson(success, status=498)
+		return text('"'+success+'"')
 
 
 @app.route('/evaluations', methods=['GET'])
@@ -1581,7 +1582,7 @@ async def evaluations(request):
 
 		return rjson(evaluationsAllData)
 	else:
-		return rjson(success, status=498)
+		return text('"'+success+'"')
 
 def __get_meal_food(meal: list[dict]):
 	"""
@@ -1649,7 +1650,7 @@ async def export_ical(request):
 		ical_url = client.export_ical()
 		return rjson({"ical_url": ical_url})
 	else:
-		return rjson(success, status=498)
+		return text('"'+success+'"')
 
 @app.route('/menu', methods=['GET'])
 async def menu(request):
@@ -1725,7 +1726,7 @@ async def menu(request):
 
 		return rjson(menusAllData)
 	else:
-		return rjson(success, status=498)
+		return text('"'+success+'"')
 	
 
 @app.route('/homework/changeState', methods=['POST'])
@@ -1798,7 +1799,7 @@ async def set_homework_as_done(request):
 			except Exception as e:
 				raise ServerError(str(e))
 	else:
-		return rjson(success, status=498)
+		return text('"'+success+'"')
 
 def main():
 	app.run(host="0.0.0.0", port=8000, fast=True)
