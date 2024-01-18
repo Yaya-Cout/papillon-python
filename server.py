@@ -134,14 +134,15 @@ async def generate_token(request):
 	print("Generating token...")
 	body = request.form
 
-	
-
 	if not body is None:
-		method = body.get('method', 'url')
-		type = body.get('type', 'eleve') 
-		version = body.get('version', '1')
-		print(body)
+		## version is an URL parameter
+		version = request.args.get('version', '2')
+		type = request.args.get('type', 'eleve')
+		method = request.args.get('method', 'url')
+
 		noENT = False
+
+		print("ver", version)
 		  
 		# if no version in URL
 		if version == '2':
@@ -376,8 +377,8 @@ async def change_period(request):
 		dict[str, str]: Le statut de la requête et le nom de la période sélectionnée
 	"""
 	
-	token = request.json.get('token')
-	periodName = request.json.get('periodName')
+	token = request.args.get('token')
+	periodName = request.args.get('periodName')
 
 	success, client = get_client(token)
 	if success == 'ok':
@@ -1112,8 +1113,8 @@ async def read_news(request):
 
 	"""
 
-	token = request.json.get('token')
-	newsId = request.json.get('newsId')
+	token = request.args.get('token')
+	newsId = request.args.get('newsId')
 
 	success, client = get_client(token)
 	if success == 'ok':
@@ -1251,8 +1252,8 @@ async def delete_discussion(request):
 		str: 'ok' si la discussion a été supprimée, 'not found' si la discussion n'a pas été trouvée, 'error' si une erreur est survenue.
 	"""
 	
-	token = request.json.get('token')
-	discussionId = request.json.get('discussionId')
+	token = request.args.get('token')
+	discussionId = request.args.get('discussionId')
 
 	success, client = get_client(token)
 	if success == 'ok':
@@ -1299,8 +1300,8 @@ async def read_discussion(request):
 		str: 'ok' si l'état de lecture a été changé, 'not found' si la discussion n'a pas été trouvée, 'error' si une erreur est survenue.
 	"""
 	
-	token = request.json.get('token')
-	discussionId = request.json.get('discussionId')
+	token = request.args.get('token')
+	discussionId = request.args.get('discussionId')
 
 	success, client = get_client(token)
 	if success == 'ok':
@@ -1353,9 +1354,9 @@ async def reply_discussion(request):
 		str: 'ok' si le message a été envoyé, 'not replyable' si la discussion n'est pas ouverte à la réponse, 'not found' si la discussion n'a pas été trouvée, 'error' si une erreur est survenue.
 	"""
 	
-	token = request.json.get('token')
-	discussionId = request.json.get('discussionId')
-	content = request.json.get('content')
+	token = request.args.get('token')
+	discussionId = request.args.get('discussionId')
+	content = request.args.get('content')
 
 	success, client = get_client(token)
 	if success == 'ok':
@@ -1462,10 +1463,10 @@ async def create_discussion(request):
 		str: 'ok' si la discussion a été créée, 'error' si une erreur est survenue.
 	"""
 	
-	token = request.json.get('token')
-	subject = request.json.get('subject')
-	content = request.json.get('content')
-	recipientsId = request.json.get('recipientsId')
+	token = request.args.get('token')
+	subject = request.args.get('subject')
+	content = request.args.get('content')
+	recipientsId = request.args.get('recipientsId')
 
 	success, client = get_client(token)
 	if success == 'ok':
@@ -1744,10 +1745,10 @@ async def set_homework_as_done(request):
 		str: 'ok' si tout s'est bien passé, 'not found' si le devoir n'a pas été trouvé, 'error' si une erreur est survenue.
 	"""
 	
-	token = request.json.get('token')
-	dateFrom = request.json.get('dateFrom')
-	dateTo = request.json.get('dateTo')
-	homeworkId = request.json.get('homeworkId')
+	token = request.args.get('token')
+	dateFrom = request.args.get('dateFrom')
+	dateTo = request.args.get('dateTo')
+	homeworkId = request.args.get('homeworkId')
 
 	try :
 		dateFrom = datetime.datetime.strptime(dateFrom, "%Y-%m-%d").date()
