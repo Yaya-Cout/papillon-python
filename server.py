@@ -94,7 +94,6 @@ def get_client(token) -> tuple[str, pronotepy.Client|None]:
 		return 'maintenance', None
 	if token in app.ctx.saved_clients:
 		client_dict = app.ctx.saved_clients[token]
-		print("li", time.time() - client_dict['last_interaction'])
 		if time.time() - client_dict['last_interaction'] < client_timeout_threshold:
 			client_dict['last_interaction'] = time.time()
 			return 'ok', client_dict['client']
@@ -131,7 +130,6 @@ async def infos(request):
 # GET * token=token
 @app.route('/generatetoken', methods=['POST'])
 async def generate_token(request):
-	print("Generating token...")
 	body = request.form
 
 	if not body is None:
@@ -141,21 +139,16 @@ async def generate_token(request):
 		method = request.args.get('method', 'url')
 
 		noENT = False
-
-		print("ver", version)
 		  
 		# if no version in URL
 		if version == '2':
 			try :
-				print("Decoding base64...")
 				body['url'] = base64.b64decode(body['url'][0]).decode('utf-8')
 				body['username'] = base64.b64decode(body['username'][0]).decode('utf-8')
 				body['password'] = base64.b64decode(body['password'][0]).decode('utf-8')
 				if 'ent' in body:
 					body['ent'] = base64.b64decode(body['ent'][0]).decode('utf-8')
-				print(body)
 			except Exception as e:
-				print(e)
 				return rjson({
 					"token": False,
 					"error": 'Invalid base64'
@@ -168,7 +161,6 @@ async def generate_token(request):
 				if 'ent' in body:
 					body['ent'] = body['ent'][0]
 			except Exception as e:
-				print(e)
 				return rjson({
 					"token": False,
 					"error": 'Invalid plain text'
@@ -224,8 +216,7 @@ async def generate_token(request):
 					"login": body['login'],
 					"url": body['url']
 				}, body['checkCode'], body['uuid'])
-			except Exception as e:
-				print(e)                
+			except Exception as e:         
 				return rjson({
 					"token": False,
 					"error": str(e),
@@ -234,7 +225,6 @@ async def generate_token(request):
 		elif method == "token":
 			for rk in ('url', 'username', 'password', 'uuid'):
 				if not rk in body:
-					print("Missing", rk)
 					return rjson({
 						"token": False,
 						"error": f'Missing {rk}'
@@ -249,7 +239,6 @@ async def generate_token(request):
 				)
 			except Exception as e:
 				print(f"Error while trying to connect to {body['url']}")
-				print(e)
 
 				return rjson({
 					"token": False,
@@ -257,10 +246,8 @@ async def generate_token(request):
 				}, status=498)
 
 		token = secrets.token_urlsafe(16)
-		print(token)
 		# Set current period
 		client.calculated_period = __get_current_period(client)
-		print(client.calculated_period)
 		client.activated_period = __get_current_period(client, False, None, True)
 
 		client_pickle = base64.b64encode(pickle.dumps(client)).decode()
@@ -331,7 +318,6 @@ def __get_current_period(client: pronotepy.Client, wantSpecificPeriod: bool = Fa
 			elif CURRENT_PERIOD_NAME == 'Année':
 				CURRENT_PERIOD_NAME = 'Année'
 			else:
-				print("WARN: Couldn't find current period name")
 				return client.current_period
 			
 			allPeriods = []
@@ -360,7 +346,6 @@ def __get_current_period(client: pronotepy.Client, wantSpecificPeriod: bool = Fa
 			for period in client.periods:
 				if period.name == specificPeriod:
 					return period
-			print("WARN: Couldn't find specific period name")
 			return __get_current_period(client, False, None)
 
 
@@ -540,7 +525,6 @@ async def timetable(request):
 	except Exception as e:
 		dateToGet = datetime.datetime.now().date()
 	success, client = get_client(token)
-	print(token)
 
 	if success == 'ok':
 		if client.logged_in:
