@@ -50,6 +50,14 @@ except Exception as e:
 
 app = Sanic("PapillonRest")
 
+app.config.REQUEST_TIMEOUT = 5
+app.config.RESPONSE_TIMEOUT = 5
+
+app.update_config({
+	'REQUEST_TIMEOUT': 5,
+	'RESPONSE_TIMEOUT': 5,
+})
+
 @app.middleware('response')
 async def CORS(request, response):
 	response.headers['Access-Control-Allow-Origin'] = '*'
